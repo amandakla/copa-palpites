@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Copa Palpites</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Palpites salvos">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <path d="M7 4h10v3.8c0 3.2-1.9 6-4.5 6.8V18H16v2H8v-2h3.5v-3.4C8.9 13.8 7 11 7 7.8V4Z"/>
+              <path d="M5 6H3v1.2c0 2.2 1.2 4.1 3 5.1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+              <path d="M19 6h2v1.2c0 2.2-1.2 4.1-3 5.1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <strong>Copa Palpites</strong>
+            <span>2026 bracket lab</span>
+          </div>
+        </div>
+
+        <button class="primary-action" id="newPredictionBtn" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          Novo palpite
+        </button>
+
+        <div class="user-panel">
+          <label for="currentUser">Simular login</label>
+          <select id="currentUser">
+          </select>
+          <div class="create-user-row">
+            <input id="newUsername" type="text" placeholder="@username" maxlength="24" autocomplete="off">
+            <button id="createUserBtn" class="secondary-action compact-action" type="button">Criar</button>
+          </div>
+          <p class="feedback" id="userFeedback" aria-live="polite"></p>
+          <button id="savePredictionBtn" class="primary-action save-full" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h13l1 1v15H5V4Z"/><path d="M8 4v6h9"/><path d="M8 19v-6h8v6"/></svg>
+            Salvar palpite
+          </button>
+          <p class="feedback error" id="saveFeedback" aria-live="polite"></p>
+          <p class="helper-text" id="editNotice">No app real, isso vira login com senha ou link mágico. O registro usa @username + número do palpite.</p>
+        </div>
+
+        <div class="prediction-list" id="predictionList"></div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Simulador de chaveamento</p>
+            <h1>Copa do Mundo 2026</h1>
+          </div>
+          <div class="status-strip">
+            <div>
+              <span id="qualifiedCount">0</span>
+              <small>classificados</small>
+            </div>
+            <div>
+              <span id="completedMatches">0</span>
+              <small>jogos definidos</small>
+            </div>
+            <div>
+              <span id="championName">-</span>
+              <small>campeão</small>
+            </div>
+          </div>
+        </header>
+
+        <nav class="main-tabs" aria-label="Navegação principal">
+          <button class="main-tab active" type="button" data-screen="home">Home</button>
+          <button class="main-tab" type="button" data-screen="prediction">Palpite</button>
+          <button class="main-tab" type="button" data-screen="admin">Admin</button>
+        </nav>
+
+        <section class="screen active" id="homeScreen" aria-label="Início">
+          <div class="period-hero" id="periodHero"></div>
+          <div class="home-grid">
+            <section class="home-panel">
+              <div class="section-heading compact">
+                <div>
+                  <h2>Períodos</h2>
+                  <p>Janelas criadas pelo admin para liberar novos palpites.</p>
+                </div>
+              </div>
+              <div class="period-list" id="periodList"></div>
+            </section>
+            <section class="home-panel">
+              <div class="section-heading compact">
+                <div>
+                  <h2>Mural</h2>
+                  <p>Resumo público dos palpites salvos.</p>
+                </div>
+              </div>
+              <div class="feed-list" id="feedList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="screen" id="predictionScreen" aria-label="Criar palpite">
+          <div class="active-period-bar" id="activePeriodBar"></div>
+        <nav class="tabs" aria-label="Etapas">
+          <button class="tab active" type="button" data-view="groups">Grupos</button>
+          <button class="tab" type="button" data-view="bracket">Chave</button>
+        </nav>
+
+        <section class="view active" id="groupsView" aria-label="Fase de grupos">
+          <div class="section-heading">
+            <div>
+              <h2>Fase de grupos</h2>
+              <p>Marque quem fica em 1º, 2º e 3º. Os terceiros entram como candidatos às 8 vagas restantes.</p>
+            </div>
+            <button class="secondary-action" id="autoFillBtn" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="M13 5l7 7-7 7"/></svg>
+              Gerar exemplo
+            </button>
+          </div>
+          <div class="groups-grid" id="groupsGrid"></div>
+        </section>
+
+        <section class="view" id="bracketView" aria-label="Chave mata-mata">
+          <div class="section-heading">
+            <div>
+              <h2>Mata-mata</h2>
+              <p>Da fase de 32 à final.</p>
+            </div>
+            <button class="secondary-action" id="resetBracketBtn" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v6h6"/></svg>
+              Limpar chave
+            </button>
+          </div>
+          <div class="bracket-shell">
+            <div class="bracket" id="bracket"></div>
+          </div>
+        </section>
+        </section>
+
+        <section class="screen" id="adminScreen" aria-label="Admin">
+          <div class="section-heading">
+            <div>
+              <h2>Admin de períodos</h2>
+              <p>Mock da área onde você cria janelas de criação de palpites.</p>
+            </div>
+          </div>
+          <form class="admin-form" id="periodForm">
+            <label>
+              Nome do período
+              <input id="periodTitle" type="text" value="Palpites da fase de grupos" maxlength="60">
+            </label>
+            <label>
+              Abre em
+              <input id="periodStart" type="datetime-local">
+            </label>
+            <label>
+              Fecha em
+              <input id="periodEnd" type="datetime-local">
+            </label>
+            <button class="primary-action" type="submit">Criar período</button>
+          </form>
+          <p class="feedback" id="periodFeedback" aria-live="polite"></p>
+          <div class="admin-period-list" id="adminPeriodList"></div>
+        </section>
+      </main>
+    </div>
+
+    <template id="groupTemplate">
+      <article class="group-card">
+        <div class="group-title"></div>
+        <div class="team-list"></div>
+      </article>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
