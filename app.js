@@ -99,6 +99,7 @@ const state = {
   currentUser: null,
   currentProfile: null,
   authMode: "login",
+  highlightMissingGroups: false,
   users: [],
   periods: [],
   predictions: [],
@@ -272,7 +273,16 @@ function renderGroups() {
 
   groups.forEach((teams, groupIndex) => {
     const node = template.content.cloneNode(true);
+    const card = node.querySelector(".group-card");
+    const missingRanks = getMissingGroupRanks(groupIndex);
+    card.classList.toggle("incomplete", state.highlightMissingGroups && Boolean(missingRanks.length));
     node.querySelector(".group-title").textContent = `Grupo ${groupLabel(groupIndex)}`;
+    if (state.highlightMissingGroups && missingRanks.length) {
+      const warning = document.createElement("span");
+      warning.className = "group-warning";
+      warning.textContent = `Falta ${missingRanks.join(", ")}`;
+      node.querySelector(".group-title").appendChild(warning);
+    }
     const guide = document.createElement("div");
     guide.className = "rank-guide";
     guide.innerHTML = "<span>Seleção</span><span>1º</span><span>2º</span><span>3º</span>";
@@ -334,6 +344,7 @@ function selectRank(groupIndex, team, rank) {
     groupPick[rank] = team;
   }
 
+  state.highlightMissingGroups = false;
   state.bracketWinners = {};
   renderGroups();
   renderBracket();
@@ -575,6 +586,11 @@ async function saveCurrentPrediction() {
   const completionIssue = getCompletionIssue();
   if (completionIssue) {
     showSaveFeedback(completionIssue);
+    if (getIncompleteGroups().length) {
+      state.highlightMissingGroups = true;
+      setView("groups");
+      renderGroups();
+    }
     return;
   }
 
@@ -620,6 +636,7 @@ async function saveCurrentPrediction() {
   else state.predictions.unshift(saved);
 
   state.activeId = saved.id;
+  state.highlightMissingGroups = false;
   renderHome();
   renderActivePeriodBar();
   renderPredictions();
@@ -1263,9 +1280,12 @@ function canEditActivePrediction() {
 }
 
 function getCompletionIssue() {
-  const missingGroups = state.picks.filter((pick) => !pick.first || !pick.second || !pick.third).length;
-  if (missingGroups) {
-    return `Complete 1º, 2º e 3º em todos os grupos. Faltam ${missingGroups} grupo(s).`;
+  const incompleteGroups = getIncompleteGroups();
+  if (incompleteGroups.length) {
+    const details = incompleteGroups
+      .map((item) => `Grupo ${item.label}: falta ${item.missingRanks.join(", ")}`)
+      .join("; ");
+    return `Complete 1º, 2º e 3º em todos os grupos. ${details}.`;
   }
 
   const missingQualified = 32 - getQualifiedSeeds().length;
@@ -1287,6 +1307,23 @@ function getCompletionIssue() {
   }
 
   return "";
+}
+
+function getIncompleteGroups() {
+  return state.picks
+    .map((pick, index) => ({
+      label: groupLabel(index),
+      missingRanks: getMissingGroupRanks(index, pick)
+    }))
+    .filter((item) => item.missingRanks.length);
+}
+
+function getMissingGroupRanks(groupIndex, pick = state.picks[groupIndex]) {
+  const ranks = [];
+  if (!pick?.first) ranks.push("1º");
+  if (!pick?.second) ranks.push("2º");
+  if (!pick?.third) ranks.push("3º");
+  return ranks;
 }
 
 function showSaveFeedback(message, isError = true) {

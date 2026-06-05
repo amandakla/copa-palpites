@@ -701,12 +701,26 @@ h2 {
   overflow: hidden;
 }
 
+.group-card.incomplete {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(177, 59, 74, 0.12), var(--shadow);
+}
+
 .group-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--line);
   padding: 13px 14px;
+  font-weight: 900;
+}
+
+.group-warning {
+  border-radius: 999px;
+  background: #f8e9eb;
+  color: var(--red);
+  padding: 4px 8px;
+  font-size: 11px;
   font-weight: 900;
 }
 
