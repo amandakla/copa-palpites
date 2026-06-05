@@ -33,6 +33,16 @@ alter table public.profiles enable row level security;
 alter table public.prediction_periods enable row level security;
 alter table public.predictions enable row level security;
 
+drop policy if exists "profiles are public readable" on public.profiles;
+drop policy if exists "users can insert own profile" on public.profiles;
+drop policy if exists "users can update own profile" on public.profiles;
+drop policy if exists "periods are public readable" on public.prediction_periods;
+drop policy if exists "admins can manage periods" on public.prediction_periods;
+drop policy if exists "predictions are public readable" on public.predictions;
+drop policy if exists "users can insert own predictions in open periods" on public.predictions;
+drop policy if exists "users can update own predictions in open periods" on public.predictions;
+drop policy if exists "users can delete own predictions in open periods" on public.predictions;
+
 create policy "profiles are public readable"
 on public.profiles for select
 using (true);
