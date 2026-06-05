@@ -130,6 +130,7 @@ const state = {
   periods: [],
   predictions: [],
   officialResult: null,
+  editingOfficial: false,
   picks: createEmptyPicks(),
   thirdOrder: [],
   bracketWinners: {}
@@ -225,7 +226,7 @@ function bindStaticEvents() {
   });
 
   els.resetBracketBtn.addEventListener("click", () => {
-    if (isReadOnlyMode() || !canCreateInActivePeriod()) return;
+    if (!canEditCurrentSheet()) return;
     state.bracketWinners = {};
     renderBracket();
     updateStatus();
@@ -238,10 +239,12 @@ function bindStaticEvents() {
       return;
     }
     state.activeId = null;
+    state.editingOfficial = false;
     state.activePeriodId = getOpenPeriod()?.id || state.activePeriodId;
     state.picks = createEmptyPicks();
     state.thirdOrder = [];
     state.bracketWinners = {};
+    renderActivePeriodBar();
     renderGroups();
     renderThirds();
     renderBracket();
@@ -254,7 +257,7 @@ function bindStaticEvents() {
 
   els.savePredictionBtn.addEventListener("click", saveCurrentPrediction);
   els.periodForm.addEventListener("submit", createPeriod);
-  els.saveOfficialBtn.addEventListener("click", saveOfficialFromActivePrediction);
+  els.saveOfficialBtn.addEventListener("click", openOfficialEditor);
 }
 
 function setScreen(screen) {
@@ -368,7 +371,7 @@ function renderGroups() {
 }
 
 function selectRank(groupIndex, team, rank) {
-  if (isReadOnlyMode() || !canCreateInActivePeriod()) return;
+  if (!canEditCurrentSheet()) return;
   clearSaveFeedback();
   const groupPick = state.picks[groupIndex];
   const currentRank = Object.keys(groupPick).find((key) => groupPick[key] === team);
@@ -490,7 +493,7 @@ function getQualifiedThirdEntries() {
 }
 
 function moveThirdPlace(fromLabel, toLabel) {
-  if (!fromLabel || fromLabel === toLabel || isReadOnlyMode() || !canCreateInActivePeriod()) return;
+  if (!fromLabel || fromLabel === toLabel || !canEditCurrentSheet()) return;
   const fromIndex = state.thirdOrder.indexOf(fromLabel);
   const toIndex = state.thirdOrder.indexOf(toLabel);
   if (fromIndex < 0 || toIndex < 0) return;
@@ -744,7 +747,7 @@ function connectorPath(from, to, side) {
 }
 
 function selectWinner(matchId, roundKey, matchIndex, entry) {
-  if (isReadOnlyMode() || !canCreateInActivePeriod()) return;
+  if (!canEditCurrentSheet()) return;
   if (!entry) return;
   clearSaveFeedback();
 
@@ -771,6 +774,11 @@ function clearForwardRounds(roundKey, matchIndex) {
 }
 
 async function saveCurrentPrediction() {
+  if (state.editingOfficial) {
+    await saveOfficialFromEditor();
+    return;
+  }
+
   if (!canEditActivePrediction()) {
     showSaveFeedback("Este palpite não pode mais ser editado. Fora do período aberto ele fica só para visualização.");
     return;
@@ -900,6 +908,7 @@ function loadPrediction(id) {
   if (!prediction) return;
 
   state.activeId = prediction.id;
+  state.editingOfficial = false;
   state.activePeriodId = getPredictionPeriodId(prediction);
   state.picks = structuredClone(prediction.picks);
   state.thirdOrder = structuredClone(prediction.thirdOrder || []);
@@ -1135,6 +1144,7 @@ function renderPeriodHero() {
   button.addEventListener("click", () => {
     state.activePeriodId = openPeriod.id;
     state.activeId = null;
+    state.editingOfficial = false;
     state.picks = createEmptyPicks();
     state.thirdOrder = [];
     state.bracketWinners = {};
@@ -1166,6 +1176,7 @@ function renderPeriodList() {
     button.addEventListener("click", () => {
       state.activePeriodId = button.dataset.periodId;
       state.activeId = null;
+      state.editingOfficial = false;
       state.picks = createEmptyPicks();
       state.thirdOrder = [];
       state.bracketWinners = {};
@@ -1214,6 +1225,15 @@ function renderFeed() {
 }
 
 function renderActivePeriodBar() {
+  if (state.editingOfficial) {
+    els.activePeriodBar.innerHTML = `
+      <span class="period-badge open">oficial</span>
+      <strong>Tabela oficial da Copa</strong>
+      <small>Modo admin: salve parcialmente e volte para atualizar ao longo da Copa.</small>
+    `;
+    return;
+  }
+
   const period = getActivePeriod();
   if (!period) {
     els.activePeriodBar.innerHTML = `<span class="period-badge closed">sem período</span><strong>Nenhum período selecionado</strong>`;
@@ -1266,7 +1286,29 @@ function renderOfficialAdmin() {
   `;
 }
 
-async function saveOfficialFromActivePrediction() {
+async function openOfficialEditor() {
+  if (!isAdmin()) return;
+  const official = state.officialResult || createEmptyOfficialResult();
+  state.editingOfficial = true;
+  state.activeId = null;
+  state.picks = structuredClone(official.picks || createEmptyPicks());
+  state.thirdOrder = structuredClone(official.thirdOrder || []);
+  state.bracketWinners = structuredClone(official.bracketWinners || {});
+  state.highlightMissingGroups = false;
+
+  renderActivePeriodBar();
+  renderGroups();
+  renderThirds();
+  renderBracket();
+  renderPredictions();
+  updateStatus();
+  updatePermissionState();
+  clearSaveFeedback();
+  setScreen("prediction");
+  setView("groups");
+}
+
+async function saveOfficialFromEditor() {
   if (!isAdmin()) {
     showPeriodFeedback("Apenas admin pode editar a tabela oficial.", true);
     return;
@@ -1290,6 +1332,7 @@ async function saveOfficialFromActivePrediction() {
 
   if (error) {
     showPeriodFeedback(`Erro ao salvar tabela oficial: ${error.message}`, true);
+    showSaveFeedback(`Erro ao salvar tabela oficial: ${error.message}`);
     return;
   }
 
@@ -1297,6 +1340,7 @@ async function saveOfficialFromActivePrediction() {
   renderOfficialAdmin();
   renderHome();
   renderPredictions();
+  showSaveFeedback("Tabela oficial salva. Ranking recalculado.", false);
   showPeriodFeedback("Tabela oficial salva. Ranking recalculado.", false);
 }
 
@@ -1485,7 +1529,9 @@ async function logout() {
   state.currentUser = null;
   state.currentProfile = null;
   state.activeId = null;
+  state.editingOfficial = false;
   state.picks = createEmptyPicks();
+  state.thirdOrder = [];
   state.bracketWinners = {};
   clearSaveFeedback();
   renderAuthState();
@@ -1639,9 +1685,14 @@ function isReadOnlyMode() {
 }
 
 function canEditActivePrediction() {
+  if (state.editingOfficial) return isAdmin();
   const active = getActivePrediction();
   if (active) return canEditPrediction(active);
   return canCreateInActivePeriod();
+}
+
+function canEditCurrentSheet() {
+  return state.editingOfficial ? isAdmin() : canEditActivePrediction();
 }
 
 function getTeamEliminationStage(team) {
@@ -1756,13 +1807,20 @@ function clearSaveFeedback() {
 }
 
 function updatePermissionState() {
-  const readOnly = isReadOnlyMode();
+  const readOnly = !state.editingOfficial && isReadOnlyMode();
   const periodOpen = canCreateInActivePeriod();
-  els.savePredictionBtn.disabled = readOnly || !periodOpen;
-  els.resetBracketBtn.disabled = readOnly || !periodOpen;
+  const canSave = state.editingOfficial ? isAdmin() : !readOnly && periodOpen;
+  els.savePredictionBtn.disabled = !canSave;
+  els.resetBracketBtn.disabled = !canEditCurrentSheet();
+  els.savePredictionBtn.innerHTML = `
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h13l1 1v15H5V4Z"/><path d="M8 4v6h9"/><path d="M8 19v-6h8v6"/></svg>
+    ${state.editingOfficial ? "Salvar tabela oficial" : "Salvar palpite"}
+  `;
 
   const active = getActivePrediction();
-  if (readOnly && active) {
+  if (state.editingOfficial) {
+    els.editNotice.textContent = "Editando a tabela oficial. Só admin pode alterar; todos veem o ranking recalculado.";
+  } else if (readOnly && active) {
     els.editNotice.textContent = `Visualizando @${getPredictionUsername(active)}. Você pode ver, mas não editar nem excluir.`;
   } else if (!periodOpen) {
     els.editNotice.textContent = "Nenhum período aberto no momento. Palpites ficam disponíveis apenas para visualização.";
@@ -1773,11 +1831,17 @@ function updatePermissionState() {
 
 function updateStatus() {
   const placements = getFinalPlacements();
-  els.championName.textContent = placements.champion ? placements.champion.team : "-";
+  els.championName.innerHTML = formatStatusTeam(placements.champion, "gold");
+  els.runnerUpName.innerHTML = formatStatusTeam(placements.runnerUp, "silver");
+  els.thirdPlaceName.innerHTML = formatStatusTeam(placements.thirdPlace, "bronze");
+  els.fourthPlaceName.innerHTML = formatStatusTeam(placements.fourthPlace);
   els.brazilStatus.textContent = getTeamEliminationStage("Brasil");
-  els.runnerUpName.textContent = placements.runnerUp ? placements.runnerUp.team : "-";
-  els.thirdPlaceName.textContent = placements.thirdPlace ? placements.thirdPlace.team : "-";
-  els.fourthPlaceName.textContent = placements.fourthPlace ? placements.fourthPlace.team : "-";
+}
+
+function formatStatusTeam(entry, medal = "") {
+  if (!entry?.team) return "-";
+  const medalHtml = medal ? `<span class="status-medal ${medal}">♛</span>` : "";
+  return `${medalHtml}<span class="flag" aria-hidden="true">${flags[entry.team] || "🏳️"}</span> ${escapeHtml(entry.team)}`;
 }
 
 function escapeHtml(value) {

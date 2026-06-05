@@ -469,12 +469,17 @@ h2 {
   gap: 8px;
 }
 
-.status-strip div {
+.status-card {
   min-height: 64px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.72);
   padding: 10px 12px;
+}
+
+.status-card.brazil-card {
+  border-color: rgba(214, 161, 45, 0.48);
+  background: #fff8d8;
 }
 
 .status-strip span,
@@ -489,6 +494,30 @@ h2 {
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.status-medal {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  color: #fff;
+  font-size: 12px;
+  margin-right: 6px;
+  vertical-align: 2px;
+}
+
+.status-medal.gold {
+  background: #d6a12d;
+}
+
+.status-medal.silver {
+  background: #aab4c1;
+}
+
+.status-medal.bronze {
+  background: #b87945;
 }
 
 .status-strip small {
