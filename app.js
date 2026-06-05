@@ -111,6 +111,7 @@ const els = {
   authScreen: document.querySelector("#authScreen"),
   authForm: document.querySelector("#authForm"),
   authUsername: document.querySelector("#authUsername"),
+  authEmailLabel: document.querySelector("#authEmailLabel"),
   authEmail: document.querySelector("#authEmail"),
   authPassword: document.querySelector("#authPassword"),
   authPasswordConfirm: document.querySelector("#authPasswordConfirm"),
@@ -251,6 +252,7 @@ function setAuthMode(mode) {
   });
   els.authSubmitBtn.textContent = state.authMode === "signup" ? "Criar conta" : "Entrar";
   els.authPassword.autocomplete = state.authMode === "signup" ? "new-password" : "current-password";
+  els.authEmailLabel.textContent = state.authMode === "signup" ? "Email" : "Email ou username";
   els.authEmail.placeholder = state.authMode === "signup" ? "voce@email.com" : "voce@email.com ou @username";
   els.authPasswordConfirm.value = "";
   els.authFeedback.textContent = "";
@@ -1077,7 +1079,7 @@ async function handleAuthSubmit(event) {
   els.authFeedback.className = "feedback";
 
   if (!identifier || !password) {
-    showAuthFeedback("Preencha email/username e senha.", true);
+    showAuthFeedback(state.authMode === "signup" ? "Preencha email e senha." : "Preencha email/username e senha.", true);
     return;
   }
 
@@ -1113,7 +1115,7 @@ async function handleAuthSubmit(event) {
     });
 
     if (error) {
-      showAuthFeedback(`Erro ao criar conta: ${error.message}`, true);
+      showAuthFeedback(formatAuthError(error, "signup"), true);
       return;
     }
 
@@ -1131,7 +1133,7 @@ async function handleAuthSubmit(event) {
 
     const { error } = await db.auth.signInWithPassword({ email, password });
     if (error) {
-      showAuthFeedback(`Erro ao entrar: ${error.message}`, true);
+      showAuthFeedback(formatAuthError(error, "login"), true);
       return;
     }
   }
@@ -1189,6 +1191,25 @@ async function resolveLoginEmail(identifier) {
 function showAuthFeedback(message, isError) {
   els.authFeedback.textContent = message;
   els.authFeedback.classList.toggle("error", isError);
+}
+
+function formatAuthError(error, mode) {
+  const message = String(error?.message || "");
+  const lower = message.toLowerCase();
+
+  if (lower.includes("email rate limit")) {
+    return "O Supabase limitou o envio de emails por alguns minutos. Aguarde um pouco antes de criar outra conta.";
+  }
+
+  if (lower.includes("invalid login credentials")) {
+    return "Email/username ou senha inválidos. Se acabou de criar a conta, confirme o email antes de entrar.";
+  }
+
+  if (lower.includes("email not confirmed")) {
+    return "Confirme seu email antes de entrar.";
+  }
+
+  return mode === "signup" ? `Erro ao criar conta: ${message}` : `Erro ao entrar: ${message}`;
 }
 
 function getCurrentUser() {
