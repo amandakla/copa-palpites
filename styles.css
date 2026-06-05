@@ -35,6 +35,58 @@ button {
   cursor: pointer;
 }
 
+.is-hidden {
+  display: none !important;
+}
+
+.auth-screen {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.auth-card {
+  display: grid;
+  gap: 28px;
+  width: min(100%, 460px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.92);
+  padding: 28px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.auth-brand {
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.auth-copy h1 {
+  margin: 4px 0 0;
+  font-size: clamp(32px, 6vw, 48px);
+  line-height: 0.98;
+}
+
+.auth-form {
+  display: grid;
+  gap: 8px;
+}
+
+.auth-form label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.auth-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 8px;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 292px minmax(0, 1fr);
@@ -170,6 +222,33 @@ select {
   gap: 8px;
 }
 
+.account-card {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 10px;
+}
+
+.account-card strong,
+.account-card small {
+  display: block;
+}
+
+.account-card strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-card small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .compact-action {
   min-height: 42px;
   padding: 0 10px;
@@ -278,6 +357,27 @@ select {
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 18px;
+}
+
+.logout-button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+}
+
+.logout-button:hover {
+  border-color: var(--ink);
+}
+
+.logout-button svg {
+  width: 20px;
+  height: 20px;
 }
 
 .eyebrow {
@@ -872,6 +972,18 @@ h2 {
   .workspace,
   .sidebar {
     padding: 16px;
+  }
+
+  .auth-screen {
+    padding: 16px;
+  }
+
+  .auth-card {
+    padding: 20px;
+  }
+
+  .auth-row {
+    grid-template-columns: 1fr;
   }
 
   h1 {

@@ -16,6 +16,7 @@ const groups = [
 const STORAGE_KEY = "copa-palpites-v3";
 const USERS_KEY = "copa-palpites-users-v1";
 const PERIODS_KEY = "copa-palpites-periods-v1";
+const SESSION_KEY = "copa-palpites-session-v1";
 
 const defaultUsers = [
   { id: "amanda", username: "amanda" },
@@ -94,6 +95,7 @@ const rounds = [
 const state = {
   activeId: null,
   activePeriodId: null,
+  currentUserId: null,
   users: [],
   periods: [],
   predictions: [],
@@ -102,6 +104,14 @@ const state = {
 };
 
 const els = {
+  appShell: document.querySelector("#appShell"),
+  authScreen: document.querySelector("#authScreen"),
+  authForm: document.querySelector("#authForm"),
+  authUsername: document.querySelector("#authUsername"),
+  authFeedback: document.querySelector("#authFeedback"),
+  logoutBtn: document.querySelector("#logoutBtn"),
+  accountAvatar: document.querySelector("#accountAvatar"),
+  accountUsername: document.querySelector("#accountUsername"),
   groupsGrid: document.querySelector("#groupsGrid"),
   bracket: document.querySelector("#bracket"),
   periodHero: document.querySelector("#periodHero"),
@@ -114,10 +124,6 @@ const els = {
   periodStart: document.querySelector("#periodStart"),
   periodEnd: document.querySelector("#periodEnd"),
   periodFeedback: document.querySelector("#periodFeedback"),
-  currentUser: document.querySelector("#currentUser"),
-  newUsername: document.querySelector("#newUsername"),
-  createUserBtn: document.querySelector("#createUserBtn"),
-  userFeedback: document.querySelector("#userFeedback"),
   savePredictionBtn: document.querySelector("#savePredictionBtn"),
   saveFeedback: document.querySelector("#saveFeedback"),
   autoFillBtn: document.querySelector("#autoFillBtn"),
@@ -139,18 +145,20 @@ function groupLabel(index) {
 
 function init() {
   loadUsers();
-  renderUserOptions();
+  loadSession();
   loadPeriods();
   selectDefaultPeriod();
   loadPredictions();
   setPeriodFormDefaults();
+  bindStaticEvents();
+  renderAuthState();
+  if (!state.currentUserId) return;
   renderHome();
   renderAdminPeriods();
   renderActivePeriodBar();
   renderGroups();
   renderBracket();
   renderPredictions();
-  bindStaticEvents();
   updateStatus();
   updatePermissionState();
 }
@@ -163,6 +171,9 @@ function setPeriodFormDefaults() {
 }
 
 function bindStaticEvents() {
+  els.authForm.addEventListener("submit", handleAuthSubmit);
+  els.logoutBtn.addEventListener("click", logout);
+
   document.querySelectorAll(".main-tab").forEach((tab) => {
     tab.addEventListener("click", () => setScreen(tab.dataset.screen));
   });
@@ -213,17 +224,6 @@ function bindStaticEvents() {
 
   els.savePredictionBtn.addEventListener("click", saveCurrentPrediction);
   els.periodForm.addEventListener("submit", createPeriod);
-  els.createUserBtn.addEventListener("click", createUser);
-  els.newUsername.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") createUser();
-  });
-  els.currentUser.addEventListener("change", () => {
-    els.userFeedback.textContent = "";
-    renderGroups();
-    renderBracket();
-    renderPredictions();
-    updatePermissionState();
-  });
 }
 
 function setScreen(screen) {
@@ -967,37 +967,76 @@ function persistUsers() {
   localStorage.setItem(USERS_KEY, JSON.stringify(state.users));
 }
 
-function renderUserOptions() {
-  els.currentUser.innerHTML = state.users.map((user) => (
-    `<option value="${escapeHtml(user.id)}">@${escapeHtml(user.username)}</option>`
-  )).join("");
+function loadSession() {
+  const savedUserId = localStorage.getItem(SESSION_KEY);
+  state.currentUserId = state.users.some((user) => user.id === savedUserId) ? savedUserId : null;
 }
 
-function createUser() {
-  const username = normalizeUsername(els.newUsername.value);
-  els.userFeedback.className = "feedback";
+function persistSession() {
+  if (state.currentUserId) {
+    localStorage.setItem(SESSION_KEY, state.currentUserId);
+  } else {
+    localStorage.removeItem(SESSION_KEY);
+  }
+}
+
+function renderAuthState() {
+  const isLoggedIn = Boolean(state.currentUserId);
+  els.authScreen.classList.toggle("is-hidden", isLoggedIn);
+  els.appShell.classList.toggle("is-hidden", !isLoggedIn);
+
+  if (!isLoggedIn) {
+    els.authUsername.focus();
+    return;
+  }
+
+  const user = getCurrentUser();
+  els.accountUsername.textContent = `@${user.username}`;
+  els.accountAvatar.textContent = user.username.slice(0, 1).toUpperCase();
+}
+
+function handleAuthSubmit(event) {
+  event.preventDefault();
+  const username = normalizeUsername(els.authUsername.value);
+  els.authFeedback.className = "feedback";
 
   if (username.length < 3) {
-    showUserFeedback("Use um username com pelo menos 3 caracteres.", true);
+    showAuthFeedback("Use um username com pelo menos 3 caracteres.", true);
     return;
   }
 
-  if (state.users.some((user) => user.username === username)) {
-    showUserFeedback(`@${username} já está em uso.`, true);
-    return;
+  let user = state.users.find((item) => item.username === username);
+
+  if (!user) {
+    user = { id: username, username };
+    state.users.push(user);
+    persistUsers();
   }
 
-  const user = { id: username, username };
-  state.users.push(user);
-  persistUsers();
-  renderUserOptions();
-  els.currentUser.value = user.id;
-  els.newUsername.value = "";
-  showUserFeedback(`@${username} criado.`, false);
+  state.currentUserId = user.id;
+  persistSession();
+  els.authUsername.value = "";
+  els.authFeedback.textContent = "";
+  renderAuthState();
+  renderHome();
+  renderAdminPeriods();
+  renderActivePeriodBar();
   renderGroups();
   renderBracket();
   renderPredictions();
+  updateStatus();
   updatePermissionState();
+  setScreen("home");
+}
+
+function logout() {
+  state.currentUserId = null;
+  state.activeId = null;
+  state.picks = createEmptyPicks();
+  state.bracketWinners = {};
+  persistSession();
+  clearSaveFeedback();
+  renderAuthState();
 }
 
 function normalizeUsername(value) {
@@ -1010,13 +1049,13 @@ function normalizeUsername(value) {
     .replace(/[^a-z0-9._]/g, "");
 }
 
-function showUserFeedback(message, isError) {
-  els.userFeedback.textContent = message;
-  els.userFeedback.classList.toggle("error", isError);
+function showAuthFeedback(message, isError) {
+  els.authFeedback.textContent = message;
+  els.authFeedback.classList.toggle("error", isError);
 }
 
 function getCurrentUser() {
-  return state.users.find((user) => user.id === els.currentUser.value) || state.users[0];
+  return state.users.find((user) => user.id === state.currentUserId) || state.users[0];
 }
 
 function getNextPredictionNumber(userId) {
@@ -1111,7 +1150,7 @@ function updatePermissionState() {
   } else if (!periodOpen) {
     els.editNotice.textContent = "Nenhum período aberto no momento. Palpites ficam disponíveis apenas para visualização.";
   } else {
-    els.editNotice.textContent = "No app real, isso vira login com senha ou link mágico. O registro usa @username + número do palpite.";
+    els.editNotice.textContent = `Palpites salvos como @${getCurrentUser().username} + número do palpite.`;
   }
 }
 
