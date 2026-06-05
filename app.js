@@ -7,7 +7,7 @@ const groups = [
   ["Holanda", "Japão", "Suécia", "Tunísia"],
   ["Bélgica", "Egito", "Irã", "Nova Zelândia"],
   ["Espanha", "Cabo Verde", "Arábia Saudita", "Uruguai"],
-  ["França", "Senegal", "Repescagem Intercontinental 2", "Noruega"],
+  ["França", "Senegal", "Iraque", "Noruega"],
   ["Argentina", "Argélia", "Áustria", "Jordânia"],
   ["Portugal", "RD Congo", "Uzbequistão", "Colômbia"],
   ["Inglaterra", "Croácia", "Gana", "Panamá"]
@@ -55,6 +55,7 @@ const flags = {
   "Holanda": "🇳🇱",
   "Inglaterra": "🏴",
   "Irã": "🇮🇷",
+  "Iraque": "🇮🇶",
   "Japão": "🇯🇵",
   "Jordânia": "🇯🇴",
   "Marrocos": "🇲🇦",
@@ -65,7 +66,6 @@ const flags = {
   "Paraguai": "🇵🇾",
   "Portugal": "🇵🇹",
   "RD Congo": "🇨🇩",
-  "Repescagem Intercontinental 2": "🌐",
   "República Tcheca": "🇨🇿",
   "Senegal": "🇸🇳",
   "Suécia": "🇸🇪",
@@ -77,11 +77,7 @@ const flags = {
 };
 
 const teamNotes = {
-  "República Tcheca": "repescagem",
-  "Bósnia": "repescagem",
-  "Turquia": "repescagem",
-  "Suécia": "repescagem",
-  "Repescagem Intercontinental 2": "Bolívia ou Iraque"
+  "Bósnia": "repescagem"
 };
 
 const rounds = [
@@ -171,9 +167,11 @@ const els = {
   resetBracketBtn: document.querySelector("#resetBracketBtn"),
   editNotice: document.querySelector("#editNotice"),
   predictionList: document.querySelector("#predictionList"),
-  qualifiedCount: document.querySelector("#qualifiedCount"),
-  completedMatches: document.querySelector("#completedMatches"),
-  championName: document.querySelector("#championName")
+  championName: document.querySelector("#championName"),
+  brazilStatus: document.querySelector("#brazilStatus"),
+  runnerUpName: document.querySelector("#runnerUpName"),
+  thirdPlaceName: document.querySelector("#thirdPlaceName"),
+  fourthPlaceName: document.querySelector("#fourthPlaceName")
 };
 
 function createEmptyPicks() {
@@ -769,7 +767,10 @@ function clearForwardRounds(roundKey, matchIndex) {
 }
 
 async function saveCurrentPrediction() {
-  if (isReadOnlyMode()) return;
+  if (!canEditActivePrediction()) {
+    showSaveFeedback("Este palpite não pode mais ser editado. Fora do período aberto ele fica só para visualização.");
+    return;
+  }
 
   if (!canCreateInActivePeriod()) {
     showSaveFeedback("Este período está fechado. Não dá para criar ou editar palpites agora.");
@@ -1484,6 +1485,56 @@ function canEditActivePrediction() {
   return canCreateInActivePeriod();
 }
 
+function getTeamEliminationStage(team) {
+  if (!team) return "-";
+  const champion = state.bracketWinners["final-0"];
+  if (champion?.team === team) return "Campeão";
+
+  const groupPick = state.picks.find((pick) => (
+    pick.first === team || pick.second === team || pick.third === team
+  ));
+  if (!groupPick) return "Grupos";
+
+  const qualified = getQualifiedSeeds().some((entry) => entry.team === team);
+  if (!qualified) return "Grupos";
+
+  for (const round of rounds) {
+    const matches = getRoundMatches(round.key);
+    for (const match of matches) {
+      const inMatch = match.teams.some((entry) => entry?.team === team);
+      if (!inMatch) continue;
+
+      const winner = state.bracketWinners[match.id];
+      if (!winner) return "Em disputa";
+      if (winner.team !== team) return round.title;
+    }
+  }
+
+  return "Em disputa";
+}
+
+function getFinalPlacements() {
+  const finalMatch = getRoundMatches("final")[0];
+  const champion = state.bracketWinners["final-0"] || null;
+  const runnerUp = champion
+    ? finalMatch.teams.find((entry) => entry && entry.team !== champion.team) || null
+    : null;
+
+  const semifinalMatches = getRoundMatches("sf");
+  const semifinalLosers = semifinalMatches.map((match) => {
+    const winner = state.bracketWinners[match.id];
+    if (!winner) return null;
+    return match.teams.find((entry) => entry && entry.team !== winner.team) || null;
+  });
+
+  return {
+    champion,
+    runnerUp,
+    thirdPlace: semifinalLosers[0] || null,
+    fourthPlace: semifinalLosers[1] || null
+  };
+}
+
 function getCompletionIssue() {
   const incompleteGroups = getIncompleteGroups();
   if (incompleteGroups.length) {
@@ -1562,13 +1613,12 @@ function updatePermissionState() {
 }
 
 function updateStatus() {
-  const qualified = getQualifiedSeeds();
-  const completed = Object.keys(state.bracketWinners).length;
-  const champion = state.bracketWinners["final-0"];
-
-  els.qualifiedCount.textContent = `${qualified.length}/32`;
-  els.completedMatches.textContent = completed;
-  els.championName.textContent = champion ? champion.team : "-";
+  const placements = getFinalPlacements();
+  els.championName.textContent = placements.champion ? placements.champion.team : "-";
+  els.brazilStatus.textContent = getTeamEliminationStage("Brasil");
+  els.runnerUpName.textContent = placements.runnerUp ? placements.runnerUp.team : "-";
+  els.thirdPlaceName.textContent = placements.thirdPlace ? placements.thirdPlace.team : "-";
+  els.fourthPlaceName.textContent = placements.fourthPlace ? placements.fourthPlace.team : "-";
 }
 
 function escapeHtml(value) {
