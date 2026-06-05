@@ -267,7 +267,7 @@ function bindStaticEvents() {
 }
 
 function setScreen(screen) {
-  if ((screen === "admin" || screen === "official") && !isAdmin()) {
+  if (screen === "admin" && !isAdmin()) {
     screen = "home";
   }
 
@@ -1303,7 +1303,6 @@ function renderOfficialAdmin() {
 }
 
 function openOfficialEditor(activateScreen = true) {
-  if (!isAdmin()) return;
   const official = state.officialResult || createEmptyOfficialResult();
   state.editingOfficial = true;
   state.activeId = null;

@@ -87,28 +87,6 @@
             <p class="eyebrow">Simulador de chaveamento</p>
             <h1>Copa do Mundo 2026</h1>
           </div>
-          <div class="status-strip">
-            <div class="status-card champion">
-              <span id="championName">-</span>
-              <small>campeão</small>
-            </div>
-            <div class="status-card runner-up">
-              <span id="runnerUpName">-</span>
-              <small>vice-campeão</small>
-            </div>
-            <div class="status-card third-place">
-              <span id="thirdPlaceName">-</span>
-              <small>3º colocado</small>
-            </div>
-            <div class="status-card fourth-place">
-              <span id="fourthPlaceName">-</span>
-              <small>4º colocado</small>
-            </div>
-            <div class="status-card brazil-card">
-              <span id="brazilStatus">-</span>
-              <small>Brasil cai em</small>
-            </div>
-          </div>
           <button class="logout-button" id="logoutBtn" type="button" title="Sair" aria-label="Sair">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 4v16"/></svg>
           </button>
@@ -117,9 +95,32 @@
         <nav class="main-tabs" aria-label="Navegação principal">
           <button class="main-tab active" type="button" data-screen="home">Home</button>
           <button class="main-tab" type="button" data-screen="prediction">Palpite</button>
-          <button class="main-tab admin-only is-hidden" type="button" data-screen="official">Tabela oficial</button>
+          <button class="main-tab" type="button" data-screen="official">Tabela oficial</button>
           <button class="main-tab admin-only is-hidden" type="button" data-screen="admin">Admin</button>
         </nav>
+
+        <div class="status-strip">
+          <div class="status-card champion">
+            <span id="championName">-</span>
+            <small>campeão</small>
+          </div>
+          <div class="status-card runner-up">
+            <span id="runnerUpName">-</span>
+            <small>vice</small>
+          </div>
+          <div class="status-card third-place">
+            <span id="thirdPlaceName">-</span>
+            <small>3º colocado</small>
+          </div>
+          <div class="status-card fourth-place">
+            <span id="fourthPlaceName">-</span>
+            <small>4º colocado</small>
+          </div>
+          <div class="status-card brazil-card">
+            <span id="brazilStatus">-</span>
+            <small>Brasil cai em</small>
+          </div>
+        </div>
 
         <section class="screen active" id="homeScreen" aria-label="Início">
           <div class="period-hero" id="periodHero"></div>
@@ -215,7 +216,7 @@
               <h2>Tabela oficial</h2>
               <p>Preencha os resultados reais aos poucos. Cada salvamento recalcula o ranking.</p>
             </div>
-            <button class="primary-action save-full" id="saveOfficialTableBtn" type="button">
+            <button class="primary-action save-full admin-only is-hidden" id="saveOfficialTableBtn" type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h13l1 1v15H5V4Z"/><path d="M8 4v6h9"/><path d="M8 19v-6h8v6"/></svg>
               Salvar tabela oficial
             </button>
