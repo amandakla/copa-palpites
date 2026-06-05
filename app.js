@@ -172,6 +172,7 @@ const els = {
   predictionSaveBar: document.querySelector("#predictionSaveBar"),
   officialWorkspace: document.querySelector("#officialWorkspace"),
   savePredictionBtn: document.querySelector("#savePredictionBtn"),
+  deletePredictionBtn: document.querySelector("#deletePredictionBtn"),
   saveFeedback: document.querySelector("#saveFeedback"),
   resetBracketBtn: document.querySelector("#resetBracketBtn"),
   editNotice: document.querySelector("#editNotice"),
@@ -237,39 +238,11 @@ function bindStaticEvents() {
     updateStatus();
   });
 
-  document.querySelector("#newPredictionBtn").addEventListener("click", () => {
-    if (!canCreateInActivePeriod()) {
-      showSaveFeedback("Não há período aberto para criar novo palpite.");
-      setScreen("home");
-      return;
-    }
-
-    const existing = getCurrentUserPredictionForPeriod(getOpenPeriod()?.id || state.activePeriodId);
-    if (existing) {
-      loadPrediction(existing.id);
-      showSaveFeedback("Você já tem um palpite neste período. Pode editar enquanto ele estiver aberto.", false);
-      setScreen("prediction");
-      return;
-    }
-
-    state.activeId = null;
-    state.editingOfficial = false;
-    state.activePeriodId = getOpenPeriod()?.id || state.activePeriodId;
-    state.picks = createEmptyPicks();
-    state.thirdOrder = [];
-    state.bracketWinners = {};
-    renderActivePeriodBar();
-    renderGroups();
-    renderThirds();
-    renderBracket();
-    renderPredictions();
-    clearSaveFeedback();
-    updateStatus();
-    updatePermissionState();
-    setScreen("prediction");
-  });
-
   els.savePredictionBtn.addEventListener("click", saveCurrentPrediction);
+  els.deletePredictionBtn.addEventListener("click", () => {
+    const active = getActivePrediction();
+    if (active) deletePrediction(active.id);
+  });
   els.periodForm.addEventListener("submit", createPeriod);
   els.saveOfficialBtn.addEventListener("click", () => setScreen("official"));
   els.saveOfficialTableBtn.addEventListener("click", saveOfficialFromEditor);
@@ -292,9 +265,12 @@ function setScreen(screen) {
   document.querySelectorAll(".screen").forEach((section) => {
     section.classList.toggle("active", section.id === `${screen}Screen`);
   });
+  document.querySelector(".status-strip").classList.toggle("is-hidden", screen !== "prediction");
 
   if (screen === "prediction") {
     attachSharedPredictionViews(els.predictionScreen, true);
+    updateStatus();
+    updatePermissionState();
   }
 }
 
@@ -916,18 +892,7 @@ function renderPredictions() {
     `;
     loadButton.addEventListener("click", () => loadPrediction(prediction.id));
 
-    const deleteButton = document.createElement("button");
-    deleteButton.type = "button";
-    deleteButton.className = "delete-prediction";
-    deleteButton.disabled = !canEditPrediction(prediction);
-    deleteButton.hidden = !canEditPrediction(prediction);
-    deleteButton.title = "Excluir palpite";
-    deleteButton.setAttribute("aria-label", `Excluir ${prediction.name}`);
-    deleteButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12"/><path d="M9 7V5h6v2"/><path d="M9 10v8"/><path d="M15 10v8"/><path d="M7 7l1 14h8l1-14"/></svg>`;
-    deleteButton.addEventListener("click", () => deletePrediction(prediction.id));
-
     row.appendChild(loadButton);
-    row.appendChild(deleteButton);
     els.predictionList.appendChild(row);
   });
 }
@@ -965,7 +930,17 @@ async function deletePrediction(id) {
   }
 
   state.predictions = state.predictions.filter((item) => item.id !== id);
-  if (state.activeId === id) state.activeId = null;
+  if (state.activeId === id) {
+    state.activeId = null;
+    state.picks = createEmptyPicks();
+    state.thirdOrder = [];
+    state.bracketWinners = {};
+    clearSaveFeedback();
+    renderGroups();
+    renderThirds();
+    renderBracket();
+    updateStatus();
+  }
   renderHome();
   renderActivePeriodBar();
   renderPredictions();
@@ -1162,30 +1137,44 @@ function renderPeriodHero() {
     return;
   }
 
+  const existing = getCurrentUserPredictionForPeriod(openPeriod.id);
+  const actionLabel = existing ? "Editar palpite" : "Criar palpite neste período";
+
   els.periodHero.innerHTML = `
     <span class="period-badge open">aberto</span>
     <h2>${escapeHtml(openPeriod.title)}</h2>
     <p>Criação liberada até ${formatDateTime(openPeriod.endsAt)}.</p>
-    <button class="primary-action" type="button" data-open-period="${escapeHtml(openPeriod.id)}">Criar palpite neste período</button>
+    <button class="primary-action" type="button" data-open-period="${escapeHtml(openPeriod.id)}">${actionLabel}</button>
   `;
 
   const button = els.periodHero.querySelector("[data-open-period]");
-  button.addEventListener("click", () => {
-    state.activePeriodId = openPeriod.id;
-    state.activeId = null;
-    state.editingOfficial = false;
-    state.picks = createEmptyPicks();
-    state.thirdOrder = [];
-    state.bracketWinners = {};
-    renderActivePeriodBar();
-    renderGroups();
-    renderThirds();
-    renderBracket();
-    renderPredictions();
-    updateStatus();
-    updatePermissionState();
+  button.addEventListener("click", () => openUserPredictionForPeriod(openPeriod.id));
+}
+
+function openUserPredictionForPeriod(periodId) {
+  const existing = getCurrentUserPredictionForPeriod(periodId);
+  if (existing) {
+    loadPrediction(existing.id);
+    showSaveFeedback("Você já tem um palpite neste período. Pode editar enquanto ele estiver aberto.", false);
     setScreen("prediction");
-  });
+    return;
+  }
+
+  state.activePeriodId = periodId;
+  state.activeId = null;
+  state.editingOfficial = false;
+  state.picks = createEmptyPicks();
+  state.thirdOrder = [];
+  state.bracketWinners = {};
+  renderActivePeriodBar();
+  renderGroups();
+  renderThirds();
+  renderBracket();
+  renderPredictions();
+  clearSaveFeedback();
+  updateStatus();
+  updatePermissionState();
+  setScreen("prediction");
 }
 
 function renderPeriodList() {
@@ -1765,18 +1754,18 @@ function canEditCurrentSheet() {
   return state.editingOfficial ? isAdmin() : canEditActivePrediction();
 }
 
-function getTeamEliminationStage(team) {
-  if (!team) return "-";
+function getTeamEliminationInfo(team) {
+  if (!team) return { stage: "-", opponent: "" };
   const champion = state.bracketWinners["final-0"];
-  if (champion?.team === team) return "Campeão";
+  if (champion?.team === team) return { stage: "Campeão", opponent: "" };
 
   const groupPick = state.picks.find((pick) => (
     pick.first === team || pick.second === team || pick.third === team
   ));
-  if (!groupPick) return "Grupos";
+  if (!groupPick) return { stage: "Grupos", opponent: "" };
 
   const qualified = getQualifiedSeeds().some((entry) => entry.team === team);
-  if (!qualified) return "Grupos";
+  if (!qualified) return { stage: "Grupos", opponent: "" };
 
   for (const round of rounds) {
     const matches = getRoundMatches(round.key);
@@ -1785,12 +1774,12 @@ function getTeamEliminationStage(team) {
       if (!inMatch) continue;
 
       const winner = state.bracketWinners[match.id];
-      if (!winner) return "Em disputa";
-      if (winner.team !== team) return round.title;
+      if (!winner) return { stage: "Em disputa", opponent: "" };
+      if (winner.team !== team) return { stage: round.title, opponent: winner.team };
     }
   }
 
-  return "Em disputa";
+  return { stage: "Em disputa", opponent: "" };
 }
 
 function getFinalPlacements() {
@@ -1881,14 +1870,19 @@ function updatePermissionState() {
   const periodOpen = canCreateInActivePeriod();
   const canSave = state.editingOfficial ? isAdmin() : !readOnly && periodOpen;
   const currentPeriodPrediction = getCurrentUserPredictionForPeriod(state.activePeriodId);
+  const active = getActivePrediction();
+  const canDelete = !state.editingOfficial && active && canEditPrediction(active);
+  els.predictionSaveBar.classList.toggle("is-hidden", !canSave && !canDelete);
+  els.savePredictionBtn.classList.toggle("is-hidden", !canSave);
+  els.deletePredictionBtn.classList.toggle("is-hidden", !canDelete);
   els.savePredictionBtn.disabled = !canSave;
+  els.deletePredictionBtn.disabled = !canDelete;
   els.resetBracketBtn.disabled = !canEditCurrentSheet();
   els.savePredictionBtn.innerHTML = `
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h13l1 1v15H5V4Z"/><path d="M8 4v6h9"/><path d="M8 19v-6h8v6"/></svg>
     ${state.editingOfficial ? "Salvar tabela oficial" : "Salvar palpite"}
   `;
 
-  const active = getActivePrediction();
   if (state.editingOfficial) {
     els.editNotice.textContent = "Editando a tabela oficial. Só admin pode alterar; todos veem o ranking recalculado.";
   } else if (readOnly && active) {
@@ -1904,17 +1898,22 @@ function updatePermissionState() {
 
 function updateStatus() {
   const placements = getFinalPlacements();
+  const brazil = getTeamEliminationInfo("Brasil");
   els.championName.innerHTML = formatStatusTeam(placements.champion, "gold");
   els.runnerUpName.innerHTML = formatStatusTeam(placements.runnerUp, "silver");
   els.thirdPlaceName.innerHTML = formatStatusTeam(placements.thirdPlace, "bronze");
   els.fourthPlaceName.innerHTML = formatStatusTeam(placements.fourthPlace);
-  els.brazilStatus.textContent = getTeamEliminationStage("Brasil");
+  els.brazilStatus.innerHTML = `
+    <small>Brasil cai em</small>
+    <span>${escapeHtml(brazil.stage)}</span>
+    ${brazil.opponent ? `<em>vs ${escapeHtml(brazil.opponent)}</em>` : ""}
+  `;
 }
 
 function formatStatusTeam(entry, medal = "") {
   if (!entry?.team) return "-";
   const medalHtml = medal ? `<span class="status-medal ${medal}">♛</span>` : "";
-  return `${medalHtml}<span class="flag" aria-hidden="true">${flags[entry.team] || "🏳️"}</span> ${escapeHtml(entry.team)}`;
+  return `<span class="status-team">${medalHtml}<span class="flag" aria-hidden="true">${flags[entry.team] || "🏳️"}</span><span>${escapeHtml(entry.team)}</span></span>`;
 }
 
 function escapeHtml(value) {

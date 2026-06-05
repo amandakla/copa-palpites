@@ -61,11 +61,6 @@
           </div>
         </div>
 
-        <button class="primary-action" id="newPredictionBtn" type="button">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          Novo palpite
-        </button>
-
           <div class="user-panel">
             <label>Conta</label>
             <div class="account-card">
@@ -99,7 +94,7 @@
           <button class="main-tab admin-only is-hidden" type="button" data-screen="admin">Admin</button>
         </nav>
 
-        <div class="status-strip">
+        <div class="status-strip is-hidden">
           <div class="status-card champion">
             <span id="championName">-</span>
             <small>campeão</small>
@@ -117,8 +112,7 @@
             <small>4º colocado</small>
           </div>
           <div class="status-card brazil-card">
-            <span id="brazilStatus">-</span>
-            <small>Brasil cai em</small>
+            <div id="brazilStatus">-</div>
           </div>
         </div>
 
@@ -156,6 +150,10 @@
             <button id="savePredictionBtn" class="primary-action save-full" type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h13l1 1v15H5V4Z"/><path d="M8 4v6h9"/><path d="M8 19v-6h8v6"/></svg>
               Salvar palpite
+            </button>
+            <button id="deletePredictionBtn" class="danger-action" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12"/><path d="M9 7V5h6v2"/><path d="M9 10v8"/><path d="M15 10v8"/><path d="M7 7l1 14h8l1-14"/></svg>
+              Excluir palpite
             </button>
           </div>
           <p class="feedback error prediction-feedback" id="saveFeedback" aria-live="polite"></p>
@@ -212,9 +210,9 @@
         <section class="screen" id="officialScreen" aria-label="Tabela oficial">
           <div class="official-header">
             <div>
-              <p class="eyebrow">Admin</p>
+              <p class="eyebrow admin-only is-hidden">Admin</p>
               <h2>Tabela oficial</h2>
-              <p>Preencha os resultados reais aos poucos. Cada salvamento recalcula o ranking.</p>
+              <p class="admin-only is-hidden">Preencha os resultados reais aos poucos. Cada salvamento recalcula o ranking.</p>
             </div>
             <button class="primary-action save-full admin-only is-hidden" id="saveOfficialTableBtn" type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h13l1 1v15H5V4Z"/><path d="M8 4v6h9"/><path d="M8 19v-6h8v6"/></svg>

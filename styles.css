@@ -181,7 +181,8 @@ svg {
 }
 
 .primary-action,
-.secondary-action {
+.secondary-action,
+.danger-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -198,6 +199,17 @@ svg {
 
 .primary-action:hover {
   background: var(--accent-strong);
+}
+
+.danger-action {
+  border: 1px solid #f0cdd2;
+  border-radius: 8px;
+  background: #f8e9eb;
+  color: var(--red);
+}
+
+.danger-action:hover {
+  background: #f3dce1;
 }
 
 button:disabled {
@@ -324,7 +336,7 @@ select {
 
 .prediction-item {
   display: grid;
-  grid-template-columns: 1fr 34px;
+  grid-template-columns: 1fr;
   gap: 8px;
   align-items: center;
   border-color: var(--line);
@@ -392,17 +404,6 @@ select {
 
 .prediction-item small {
   color: var(--muted);
-}
-
-.delete-prediction {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 0;
-  border-radius: 8px;
-  background: #f8e9eb;
-  color: var(--red);
 }
 
 .workspace {
@@ -483,16 +484,30 @@ h2 {
   background: #fff8d8;
 }
 
-.status-strip span,
-.status-strip small {
+.status-card > span,
+.status-card > small {
   display: block;
 }
 
-.status-strip span {
+.status-card > span,
+.brazil-card span {
   overflow: hidden;
   color: var(--ink);
   font-size: 15px;
   font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-team {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.status-team span:last-child {
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -516,10 +531,27 @@ h2 {
   color: #b87945;
 }
 
-.status-strip small {
+.status-card > small,
+.brazil-card small {
+  display: block;
   color: var(--muted);
   font-size: 11px;
   margin-top: 2px;
+}
+
+.brazil-card small {
+  margin: 0 0 2px;
+}
+
+.brazil-card em {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tabs {
@@ -750,6 +782,12 @@ h2 {
   color: var(--muted);
   font-size: 13px;
   margin-top: 3px;
+}
+
+.prediction-save-bar .save-full {
+  flex: 1;
+  width: auto;
+  min-width: 220px;
 }
 
 .prediction-feedback {
