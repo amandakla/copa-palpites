@@ -243,6 +243,15 @@ function bindStaticEvents() {
       setScreen("home");
       return;
     }
+
+    const existing = getCurrentUserPredictionForPeriod(getOpenPeriod()?.id || state.activePeriodId);
+    if (existing) {
+      loadPrediction(existing.id);
+      showSaveFeedback("Você já tem um palpite neste período. Pode editar enquanto ele estiver aberto.", false);
+      setScreen("prediction");
+      return;
+    }
+
     state.activeId = null;
     state.editingOfficial = false;
     state.activePeriodId = getOpenPeriod()?.id || state.activePeriodId;
@@ -821,8 +830,12 @@ async function saveCurrentPrediction() {
 
   const now = new Date();
   const user = getCurrentUser();
-  const sequence = getNextPredictionNumber(user.id);
-  const number = state.activeId ? getActivePredictionNumber() : sequence;
+  const existingPrediction = getCurrentUserPredictionForPeriod(state.activePeriodId);
+  if (!state.activeId && existingPrediction) {
+    state.activeId = existingPrediction.id;
+  }
+
+  const number = state.activeId ? getActivePredictionNumber() : 1;
   const row = {
     user_id: user.id,
     period_id: state.activePeriodId,
@@ -852,7 +865,7 @@ async function saveCurrentPrediction() {
   }
 
   if (result.error) {
-    showSaveFeedback(`Erro ao salvar: ${result.error.message}`);
+    showSaveFeedback(`Erro ao salvar: ${formatPredictionSaveError(result.error)}`);
     return;
   }
 
@@ -1646,21 +1659,29 @@ function getCurrentUser() {
   };
 }
 
-function getNextPredictionNumber(userId) {
-  const numbers = state.predictions
-    .filter((prediction) => prediction.userId === userId && getPredictionPeriodId(prediction) === state.activePeriodId)
-    .map((prediction) => Number(prediction.number || 0));
-  return Math.max(0, ...numbers) + 1;
-}
-
 function getActivePredictionNumber() {
   const active = state.predictions.find((prediction) => prediction.id === state.activeId);
   if (active?.number) return active.number;
-  return getNextPredictionNumber(getCurrentUser().id);
+  return 1;
 }
 
 function getActivePrediction() {
   return state.predictions.find((prediction) => prediction.id === state.activeId) || null;
+}
+
+function getCurrentUserPredictionForPeriod(periodId) {
+  const user = getCurrentUser();
+  return state.predictions.find((prediction) => (
+    prediction.userId === user.id && getPredictionPeriodId(prediction) === periodId
+  )) || null;
+}
+
+function formatPredictionSaveError(error) {
+  const message = String(error?.message || "");
+  if (message.toLowerCase().includes("duplicate") || message.includes("one_prediction_per_user_period")) {
+    return "Você já tem um palpite neste período. Abra o palpite salvo para editar.";
+  }
+  return message;
 }
 
 function getPredictionUsername(prediction) {
@@ -1859,6 +1880,7 @@ function updatePermissionState() {
   const readOnly = !state.editingOfficial && isReadOnlyMode();
   const periodOpen = canCreateInActivePeriod();
   const canSave = state.editingOfficial ? isAdmin() : !readOnly && periodOpen;
+  const currentPeriodPrediction = getCurrentUserPredictionForPeriod(state.activePeriodId);
   els.savePredictionBtn.disabled = !canSave;
   els.resetBracketBtn.disabled = !canEditCurrentSheet();
   els.savePredictionBtn.innerHTML = `
@@ -1873,8 +1895,10 @@ function updatePermissionState() {
     els.editNotice.textContent = `Visualizando @${getPredictionUsername(active)}. Você pode ver, mas não editar nem excluir.`;
   } else if (!periodOpen) {
     els.editNotice.textContent = "Nenhum período aberto no momento. Palpites ficam disponíveis apenas para visualização.";
+  } else if (currentPeriodPrediction && !state.activeId) {
+    els.editNotice.textContent = "Você já tem um palpite neste período. Abra ele para editar enquanto o período estiver aberto.";
   } else {
-    els.editNotice.textContent = `Palpites salvos como @${getCurrentUser().username} + número do palpite.`;
+    els.editNotice.textContent = `Um palpite por período. Salvo como @${getCurrentUser().username} #1.`;
   }
 }
 

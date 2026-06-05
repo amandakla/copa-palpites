@@ -27,8 +27,15 @@ create table if not exists public.predictions (
   champion text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (user_id, period_id, prediction_number)
+  unique (user_id, period_id, prediction_number),
+  constraint one_prediction_per_user_period unique (user_id, period_id)
 );
+
+alter table public.predictions
+drop constraint if exists one_prediction_per_user_period;
+
+alter table public.predictions
+add constraint one_prediction_per_user_period unique (user_id, period_id);
 
 create table if not exists public.official_results (
   id text primary key default 'current' check (id = 'current'),
