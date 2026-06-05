@@ -1067,13 +1067,13 @@ async function handleAuthSubmit(event) {
     return;
   }
 
-  const email = els.authEmail.value.trim();
+  const identifier = els.authEmail.value.trim();
   const password = els.authPassword.value;
   const username = normalizeUsername(els.authUsername.value);
   els.authFeedback.className = "feedback";
 
-  if (!email || !password) {
-    showAuthFeedback("Preencha email e senha.", true);
+  if (!identifier || !password) {
+    showAuthFeedback("Preencha email/username e senha.", true);
     return;
   }
 
@@ -1090,7 +1090,7 @@ async function handleAuthSubmit(event) {
     }
 
     const { data, error } = await db.auth.signUp({
-      email,
+      email: identifier,
       password,
       options: { data: { username } }
     });
@@ -1106,6 +1106,12 @@ async function handleAuthSubmit(event) {
       return;
     }
   } else {
+    const email = await resolveLoginEmail(identifier);
+    if (!email) {
+      showAuthFeedback("Usuário não encontrado.", true);
+      return;
+    }
+
     const { error } = await db.auth.signInWithPassword({ email, password });
     if (error) {
       showAuthFeedback(`Erro ao entrar: ${error.message}`, true);
@@ -1142,6 +1148,24 @@ function normalizeUsername(value) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9._]/g, "");
+}
+
+async function resolveLoginEmail(identifier) {
+  if (identifier.includes("@") && identifier.includes(".")) return identifier;
+
+  const username = normalizeUsername(identifier);
+  if (username.length < 3) return "";
+
+  const { data, error } = await db.rpc("get_email_by_username", {
+    requested_username: username
+  });
+
+  if (error) {
+    showAuthFeedback(`Erro ao buscar username: ${error.message}`, true);
+    return "";
+  }
+
+  return data || "";
 }
 
 function showAuthFeedback(message, isError) {

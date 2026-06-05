@@ -56,6 +56,19 @@ create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function public.handle_new_user();
 
+create or replace function public.get_email_by_username(requested_username text)
+returns text
+language sql
+security definer
+set search_path = public, auth
+as $$
+  select auth.users.email
+  from public.profiles
+  join auth.users on auth.users.id = profiles.id
+  where profiles.username = lower(regexp_replace(requested_username, '[^a-z0-9._]', '', 'g'))
+  limit 1;
+$$;
+
 alter table public.profiles enable row level security;
 alter table public.prediction_periods enable row level security;
 alter table public.predictions enable row level security;
