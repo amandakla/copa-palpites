@@ -145,6 +145,7 @@
           <div class="active-period-bar" id="activePeriodBar"></div>
         <nav class="tabs" aria-label="Etapas">
           <button class="tab active" type="button" data-view="groups">Grupos</button>
+          <button class="tab" type="button" data-view="thirds">Terceiros</button>
           <button class="tab" type="button" data-view="bracket">Chave</button>
         </nav>
 
@@ -156,6 +157,23 @@
             </div>
           </div>
           <div class="groups-grid" id="groupsGrid"></div>
+        </section>
+
+        <section class="view" id="thirdsView" aria-label="Ranking dos terceiros colocados">
+          <div class="section-heading">
+            <div>
+              <h2>Terceiros colocados</h2>
+              <p>Arraste os 12 terceiros colocados do melhor para o pior. Os 8 primeiros avançam para a chave.</p>
+            </div>
+          </div>
+          <div class="thirds-board">
+            <div class="thirds-guidance">
+              <strong>Como preencher</strong>
+              <span>1º ao 8º: classificados para o mata-mata.</span>
+              <span>9º ao 12º: eliminados na fase de grupos.</span>
+            </div>
+            <ol class="thirds-list" id="thirdsList"></ol>
+          </div>
         </section>
 
         <section class="view" id="bracketView" aria-label="Chave mata-mata">

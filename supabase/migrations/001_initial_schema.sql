@@ -22,12 +22,16 @@ create table if not exists public.predictions (
   prediction_number integer not null,
   name text not null,
   picks jsonb not null,
+  third_place_order jsonb not null default '[]'::jsonb,
   bracket_winners jsonb not null,
   champion text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id, period_id, prediction_number)
 );
+
+alter table public.predictions
+add column if not exists third_place_order jsonb not null default '[]'::jsonb;
 
 create or replace function public.handle_new_user()
 returns trigger

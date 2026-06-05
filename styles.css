@@ -818,6 +818,119 @@ h2 {
   color: #fff;
 }
 
+.thirds-board {
+  display: grid;
+  gap: 14px;
+}
+
+.thirds-guidance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.74);
+  padding: 14px;
+}
+
+.thirds-guidance strong {
+  color: var(--ink);
+}
+
+.thirds-guidance span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.thirds-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.third-item {
+  display: grid;
+  grid-template-columns: 34px 24px 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+  box-shadow: 0 8px 24px rgba(31, 36, 45, 0.06);
+}
+
+.third-item.qualified {
+  border-color: rgba(2, 122, 98, 0.36);
+  background: #effaf6;
+}
+
+.third-item.eliminated {
+  opacity: 0.72;
+}
+
+.third-item.dragging {
+  opacity: 0.5;
+}
+
+.third-position {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.third-handle {
+  color: var(--muted);
+  cursor: grab;
+  font-weight: 900;
+}
+
+.third-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.third-copy strong,
+.third-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.third-copy small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.third-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.third-actions button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 900;
+}
+
 .bracket-shell {
   overflow-x: auto;
   border: 1px solid var(--line);
@@ -1000,7 +1113,8 @@ h2 {
   }
 
   .home-grid,
-  .admin-form {
+  .admin-form,
+  .thirds-list {
     grid-template-columns: 1fr;
   }
 }
@@ -1059,5 +1173,13 @@ h2 {
   .rank-button {
     width: 38px;
     height: 38px;
+  }
+
+  .third-item {
+    grid-template-columns: 30px 22px 26px minmax(0, 1fr);
+  }
+
+  .third-actions {
+    grid-column: 4;
   }
 }

@@ -85,11 +85,41 @@ const teamNotes = {
 };
 
 const rounds = [
-  { key: "r32", title: "16 avos", size: 16 },
+  { key: "r32", title: "Segundas", size: 16 },
   { key: "r16", title: "Oitavas", size: 8 },
   { key: "qf", title: "Quartas", size: 4 },
   { key: "sf", title: "Semifinais", size: 2 },
   { key: "final", title: "Final", size: 1 }
+];
+
+const thirdPlaceholderSlots = [
+  { code: "3ABCDF", groups: ["A", "B", "C", "D", "F"] },
+  { code: "3CDFGH", groups: ["C", "D", "F", "G", "H"] },
+  { code: "3BEFIJ", groups: ["B", "E", "F", "I", "J"] },
+  { code: "3AEHIJ", groups: ["A", "E", "H", "I", "J"] },
+  { code: "3CEFIJ", groups: ["C", "E", "F", "I", "J"] },
+  { code: "3EHIJK", groups: ["E", "H", "I", "J", "K"] },
+  { code: "3EFGIJ", groups: ["E", "F", "G", "I", "J"] },
+  { code: "3DEIJL", groups: ["D", "E", "I", "J", "L"] }
+];
+
+const r32Slots = [
+  ["1E", "3ABCDF"],
+  ["1I", "3CDFGH"],
+  ["2A", "2B"],
+  ["1F", "2C"],
+  ["2K", "2L"],
+  ["1H", "2J"],
+  ["1D", "3BEFIJ"],
+  ["1G", "3AEHIJ"],
+  ["1C", "2F"],
+  ["2E", "2I"],
+  ["1A", "3CEFIJ"],
+  ["1L", "3EHIJK"],
+  ["1J", "2H"],
+  ["2D", "2G"],
+  ["1B", "3EFGIJ"],
+  ["1K", "3DEIJL"]
 ];
 
 const state = {
@@ -104,6 +134,7 @@ const state = {
   periods: [],
   predictions: [],
   picks: createEmptyPicks(),
+  thirdOrder: [],
   bracketWinners: {}
 };
 
@@ -123,6 +154,7 @@ const els = {
   accountUsername: document.querySelector("#accountUsername"),
   accountRole: document.querySelector("#accountRole"),
   groupsGrid: document.querySelector("#groupsGrid"),
+  thirdsList: document.querySelector("#thirdsList"),
   bracket: document.querySelector("#bracket"),
   periodHero: document.querySelector("#periodHero"),
   periodList: document.querySelector("#periodList"),
@@ -207,8 +239,10 @@ function bindStaticEvents() {
     state.activeId = null;
     state.activePeriodId = getOpenPeriod()?.id || state.activePeriodId;
     state.picks = createEmptyPicks();
+    state.thirdOrder = [];
     state.bracketWinners = {};
     renderGroups();
+    renderThirds();
     renderBracket();
     renderPredictions();
     clearSaveFeedback();
@@ -345,8 +379,10 @@ function selectRank(groupIndex, team, rank) {
   }
 
   state.highlightMissingGroups = false;
+  syncThirdOrder();
   state.bracketWinners = {};
   renderGroups();
+  renderThirds();
   renderBracket();
   updateStatus();
 }
@@ -354,31 +390,188 @@ function selectRank(groupIndex, team, rank) {
 function getQualifiedSeeds() {
   const firsts = [];
   const seconds = [];
-  const thirds = [];
+  const thirdMap = getThirdPlaceMap();
+  const selectedThirds = getQualifiedThirdEntries();
 
   state.picks.forEach((pick, index) => {
     const label = groupLabel(index);
     if (pick.first) firsts.push({ team: pick.first, seed: `${label}1` });
     if (pick.second) seconds.push({ team: pick.second, seed: `${label}2` });
-    if (pick.third) thirds.push({ team: pick.third, seed: `${label}3` });
   });
 
-  return [...firsts, ...seconds, ...thirds.slice(0, 8)];
+  return [...firsts, ...seconds, ...selectedThirds.map((label) => thirdMap[label]).filter(Boolean)];
+}
+
+function renderThirds() {
+  syncThirdOrder();
+  els.thirdsList.innerHTML = "";
+
+  const thirdMap = getThirdPlaceMap();
+  if (!state.thirdOrder.length) {
+    els.thirdsList.innerHTML = `<li class="empty-state">Escolha o 3º colocado de todos os grupos para ordenar os terceiros.</li>`;
+    return;
+  }
+
+  state.thirdOrder.forEach((label, index) => {
+    const entry = thirdMap[label];
+    const item = document.createElement("li");
+    item.className = `third-item ${index < 8 ? "qualified" : "eliminated"}`;
+    item.draggable = canEditActivePrediction();
+    item.dataset.group = label;
+    item.innerHTML = `
+      <span class="third-position">${index + 1}</span>
+      <span class="third-handle" aria-hidden="true">☰</span>
+      <span class="flag" aria-hidden="true">${flags[entry.team] || "🏳️"}</span>
+      <span class="third-copy">
+        <strong>${escapeHtml(entry.team)}</strong>
+        <small>${index < 8 ? "classificado" : "eliminado"} · Grupo ${escapeHtml(label)}</small>
+      </span>
+      <span class="third-actions">
+        <button type="button" aria-label="Subir ${escapeHtml(entry.team)}" ${index === 0 || !canEditActivePrediction() ? "disabled" : ""} data-third-up="${escapeHtml(label)}">↑</button>
+        <button type="button" aria-label="Descer ${escapeHtml(entry.team)}" ${index === state.thirdOrder.length - 1 || !canEditActivePrediction() ? "disabled" : ""} data-third-down="${escapeHtml(label)}">↓</button>
+      </span>
+    `;
+
+    item.addEventListener("dragstart", (event) => {
+      if (!canEditActivePrediction()) return;
+      event.dataTransfer.setData("text/plain", label);
+      event.dataTransfer.effectAllowed = "move";
+      item.classList.add("dragging");
+    });
+    item.addEventListener("dragend", () => item.classList.remove("dragging"));
+    item.addEventListener("dragover", (event) => {
+      if (!canEditActivePrediction()) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+    });
+    item.addEventListener("drop", (event) => {
+      event.preventDefault();
+      moveThirdPlace(event.dataTransfer.getData("text/plain"), label);
+    });
+
+    els.thirdsList.appendChild(item);
+  });
+
+  els.thirdsList.querySelectorAll("[data-third-up]").forEach((button) => {
+    button.addEventListener("click", () => moveThirdPlaceByOffset(button.dataset.thirdUp, -1));
+  });
+  els.thirdsList.querySelectorAll("[data-third-down]").forEach((button) => {
+    button.addEventListener("click", () => moveThirdPlaceByOffset(button.dataset.thirdDown, 1));
+  });
+}
+
+function syncThirdOrder() {
+  const labels = getThirdPlaceEntries().map((entry) => entry.group);
+  state.thirdOrder = [
+    ...state.thirdOrder.filter((label) => labels.includes(label)),
+    ...labels.filter((label) => !state.thirdOrder.includes(label))
+  ];
+}
+
+function getThirdPlaceEntries() {
+  return state.picks
+    .map((pick, index) => ({
+      group: groupLabel(index),
+      team: pick.third,
+      seed: `${groupLabel(index)}3`
+    }))
+    .filter((entry) => entry.team);
+}
+
+function getThirdPlaceMap() {
+  return Object.fromEntries(getThirdPlaceEntries().map((entry) => [entry.group, entry]));
+}
+
+function getQualifiedThirdEntries() {
+  syncThirdOrder();
+  return state.thirdOrder.slice(0, 8);
+}
+
+function moveThirdPlace(fromLabel, toLabel) {
+  if (!fromLabel || fromLabel === toLabel || isReadOnlyMode() || !canCreateInActivePeriod()) return;
+  const fromIndex = state.thirdOrder.indexOf(fromLabel);
+  const toIndex = state.thirdOrder.indexOf(toLabel);
+  if (fromIndex < 0 || toIndex < 0) return;
+
+  const nextOrder = [...state.thirdOrder];
+  nextOrder.splice(fromIndex, 1);
+  nextOrder.splice(toIndex, 0, fromLabel);
+  state.thirdOrder = nextOrder;
+  state.bracketWinners = {};
+  clearSaveFeedback();
+  renderThirds();
+  renderBracket();
+  updateStatus();
+}
+
+function moveThirdPlaceByOffset(label, offset) {
+  const index = state.thirdOrder.indexOf(label);
+  const target = state.thirdOrder[index + offset];
+  if (!target) return;
+  moveThirdPlace(label, target);
 }
 
 function buildInitialMatches() {
-  const seeds = getQualifiedSeeds();
-  const slots = [
-    [0, 31], [15, 16], [7, 24], [8, 23],
-    [3, 28], [12, 19], [4, 27], [11, 20],
-    [1, 30], [14, 17], [6, 25], [9, 22],
-    [2, 29], [13, 18], [5, 26], [10, 21]
-  ];
-
-  return slots.map(([a, b], index) => ({
+  return r32Slots.map(([a, b], index) => ({
     id: `r32-${index}`,
-    teams: [seeds[a] || null, seeds[b] || null]
+    teams: [getSeedEntry(a), getSeedEntry(b)]
   }));
+}
+
+function getSeedEntry(code) {
+  const direct = code.match(/^([12])([A-L])$/);
+  if (direct) {
+    const rank = direct[1] === "1" ? "first" : "second";
+    const groupIndex = direct[2].charCodeAt(0) - 65;
+    const team = state.picks[groupIndex]?.[rank];
+    return team ? { team, seed: code } : null;
+  }
+
+  const thirdAssignments = assignThirdPlaceSlots();
+  const assignedGroup = thirdAssignments[code];
+  if (!assignedGroup) return null;
+
+  const entry = getThirdPlaceMap()[assignedGroup];
+  return entry ? { team: entry.team, seed: `3${assignedGroup}` } : null;
+}
+
+function assignThirdPlaceSlots() {
+  const qualified = getQualifiedThirdEntries();
+  const rank = Object.fromEntries(qualified.map((label, index) => [label, index]));
+  const slots = thirdPlaceholderSlots.map((slot) => ({
+    ...slot,
+    candidates: qualified
+      .filter((label) => slot.groups.includes(label))
+      .sort((a, b) => rank[a] - rank[b])
+  }));
+
+  const assignment = {};
+  const used = new Set();
+
+  const search = (index) => {
+    if (index === slots.length) return true;
+    const slot = slots[index];
+
+    for (const candidate of slot.candidates) {
+      if (used.has(candidate)) continue;
+      used.add(candidate);
+      assignment[slot.code] = candidate;
+      if (search(index + 1)) return true;
+      used.delete(candidate);
+      delete assignment[slot.code];
+    }
+
+    return false;
+  };
+
+  if (qualified.length === 8 && search(0)) return assignment;
+
+  slots.forEach((slot) => {
+    assignment[slot.code] = slot.candidates.find((candidate) => !used.has(candidate)) || null;
+    if (assignment[slot.code]) used.add(assignment[slot.code]);
+  });
+
+  return assignment;
 }
 
 function getRoundMatches(roundKey) {
@@ -490,7 +683,7 @@ function getBracketLayout() {
   const leftX = { r32: 0, r16: 192, qf: 384, sf: 584, final: 804 };
   const rightX = { sf: 1064, qf: 1264, r16: 1456, r32: 1648 };
   const titles = {
-    r32: "16 avos",
+    r32: "Segundas",
     r16: "Oitavas",
     qf: "Quartas",
     sf: "Semifinal",
@@ -590,6 +783,9 @@ async function saveCurrentPrediction() {
       state.highlightMissingGroups = true;
       setView("groups");
       renderGroups();
+    } else if (getThirdPlaceEntries().length < 12 || state.thirdOrder.length < 12) {
+      setView("thirds");
+      renderThirds();
     }
     return;
   }
@@ -604,6 +800,7 @@ async function saveCurrentPrediction() {
     prediction_number: number,
     name: `@${user.username} #${number}`,
     picks: structuredClone(state.picks),
+    third_place_order: structuredClone(state.thirdOrder),
     bracket_winners: structuredClone(state.bracketWinners),
     champion: state.bracketWinners["final-0"].team,
     updated_at: now.toISOString()
@@ -696,9 +893,11 @@ function loadPrediction(id) {
   state.activeId = prediction.id;
   state.activePeriodId = getPredictionPeriodId(prediction);
   state.picks = structuredClone(prediction.picks);
+  state.thirdOrder = structuredClone(prediction.thirdOrder || []);
   state.bracketWinners = structuredClone(prediction.bracketWinners);
 
   renderGroups();
+  renderThirds();
   renderBracket();
   renderHome();
   renderActivePeriodBar();
@@ -734,6 +933,7 @@ async function refreshAppData() {
   renderAdminPeriods();
   renderActivePeriodBar();
   renderGroups();
+  renderThirds();
   renderBracket();
   renderPredictions();
   updateStatus();
@@ -810,6 +1010,7 @@ function mapPrediction(prediction) {
     savedAt: formatDateTime(prediction.updated_at || prediction.created_at),
     savedAtISO: prediction.updated_at || prediction.created_at,
     picks: prediction.picks,
+    thirdOrder: prediction.third_place_order || [],
     bracketWinners: prediction.bracket_winners,
     champion: prediction.champion
   };
@@ -888,9 +1089,11 @@ function renderPeriodHero() {
     state.activePeriodId = openPeriod.id;
     state.activeId = null;
     state.picks = createEmptyPicks();
+    state.thirdOrder = [];
     state.bracketWinners = {};
     renderActivePeriodBar();
     renderGroups();
+    renderThirds();
     renderBracket();
     renderPredictions();
     updateStatus();
@@ -917,10 +1120,12 @@ function renderPeriodList() {
       state.activePeriodId = button.dataset.periodId;
       state.activeId = null;
       state.picks = createEmptyPicks();
+      state.thirdOrder = [];
       state.bracketWinners = {};
       renderHome();
       renderActivePeriodBar();
       renderGroups();
+      renderThirds();
       renderBracket();
       renderPredictions();
       updateStatus();
@@ -1291,6 +1496,10 @@ function getCompletionIssue() {
   const missingQualified = 32 - getQualifiedSeeds().length;
   if (missingQualified > 0) {
     return `A fase de grupos ainda não gerou 32 classificados. Faltam ${missingQualified}.`;
+  }
+
+  if (getThirdPlaceEntries().length < 12 || state.thirdOrder.length < 12) {
+    return "Ordene os 12 terceiros colocados do melhor para o pior. Os 8 primeiros avançam.";
   }
 
   const requiredMatchIds = rounds.flatMap((round) => (
