@@ -117,6 +117,7 @@
         <nav class="main-tabs" aria-label="Navegação principal">
           <button class="main-tab active" type="button" data-screen="home">Home</button>
           <button class="main-tab" type="button" data-screen="prediction">Palpite</button>
+          <button class="main-tab admin-only is-hidden" type="button" data-screen="official">Tabela oficial</button>
           <button class="main-tab admin-only is-hidden" type="button" data-screen="admin">Admin</button>
         </nav>
 
@@ -146,7 +147,7 @@
 
         <section class="screen" id="predictionScreen" aria-label="Criar palpite">
           <div class="active-period-bar" id="activePeriodBar"></div>
-          <div class="prediction-save-bar">
+          <div class="prediction-save-bar" id="predictionSaveBar">
             <div>
               <strong>Salvar palpite</strong>
               <p>O palpite precisa estar completo: grupos, terceiros, chave e campeão.</p>
@@ -207,6 +208,22 @@
         </section>
         </section>
 
+        <section class="screen" id="officialScreen" aria-label="Tabela oficial">
+          <div class="official-header">
+            <div>
+              <p class="eyebrow">Admin</p>
+              <h2>Tabela oficial</h2>
+              <p>Preencha os resultados reais aos poucos. Cada salvamento recalcula o ranking.</p>
+            </div>
+            <button class="primary-action save-full" id="saveOfficialTableBtn" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h13l1 1v15H5V4Z"/><path d="M8 4v6h9"/><path d="M8 19v-6h8v6"/></svg>
+              Salvar tabela oficial
+            </button>
+          </div>
+          <p class="feedback error prediction-feedback" id="officialFeedback" aria-live="polite"></p>
+          <div class="official-workspace" id="officialWorkspace"></div>
+        </section>
+
         <section class="screen" id="adminScreen" aria-label="Admin">
           <div class="section-heading">
             <div>
@@ -242,7 +259,7 @@
             <div class="official-summary" id="officialSummary"></div>
             <button class="secondary-action" id="saveOfficialBtn" type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16"/><path d="M5 16l5-5 4 4 6-8"/><path d="M14 7h6v6"/></svg>
-              Editar tabela oficial
+              Abrir tabela oficial
             </button>
           </section>
         </section>

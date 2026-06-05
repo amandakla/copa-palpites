@@ -166,6 +166,11 @@ const els = {
   periodFeedback: document.querySelector("#periodFeedback"),
   officialSummary: document.querySelector("#officialSummary"),
   saveOfficialBtn: document.querySelector("#saveOfficialBtn"),
+  saveOfficialTableBtn: document.querySelector("#saveOfficialTableBtn"),
+  officialFeedback: document.querySelector("#officialFeedback"),
+  predictionScreen: document.querySelector("#predictionScreen"),
+  predictionSaveBar: document.querySelector("#predictionSaveBar"),
+  officialWorkspace: document.querySelector("#officialWorkspace"),
   savePredictionBtn: document.querySelector("#savePredictionBtn"),
   saveFeedback: document.querySelector("#saveFeedback"),
   resetBracketBtn: document.querySelector("#resetBracketBtn"),
@@ -257,12 +262,19 @@ function bindStaticEvents() {
 
   els.savePredictionBtn.addEventListener("click", saveCurrentPrediction);
   els.periodForm.addEventListener("submit", createPeriod);
-  els.saveOfficialBtn.addEventListener("click", openOfficialEditor);
+  els.saveOfficialBtn.addEventListener("click", () => setScreen("official"));
+  els.saveOfficialTableBtn.addEventListener("click", saveOfficialFromEditor);
 }
 
 function setScreen(screen) {
-  if (screen === "admin" && !isAdmin()) {
+  if ((screen === "admin" || screen === "official") && !isAdmin()) {
     screen = "home";
+  }
+
+  if (screen === "official") {
+    openOfficialEditor(false);
+  } else if (state.editingOfficial) {
+    closeOfficialEditor();
   }
 
   document.querySelectorAll(".main-tab").forEach((tab) => {
@@ -271,6 +283,10 @@ function setScreen(screen) {
   document.querySelectorAll(".screen").forEach((section) => {
     section.classList.toggle("active", section.id === `${screen}Screen`);
   });
+
+  if (screen === "prediction") {
+    attachSharedPredictionViews(els.predictionScreen, true);
+  }
 }
 
 function setView(view) {
@@ -1286,7 +1302,7 @@ function renderOfficialAdmin() {
   `;
 }
 
-async function openOfficialEditor() {
+function openOfficialEditor(activateScreen = true) {
   if (!isAdmin()) return;
   const official = state.officialResult || createEmptyOfficialResult();
   state.editingOfficial = true;
@@ -1296,21 +1312,45 @@ async function openOfficialEditor() {
   state.bracketWinners = structuredClone(official.bracketWinners || {});
   state.highlightMissingGroups = false;
 
-  renderActivePeriodBar();
+  attachSharedPredictionViews(els.officialWorkspace, false);
   renderGroups();
   renderThirds();
   renderBracket();
   renderPredictions();
   updateStatus();
   updatePermissionState();
-  clearSaveFeedback();
-  setScreen("prediction");
+  clearOfficialFeedback();
+  if (activateScreen) setScreen("official");
   setView("groups");
+}
+
+function closeOfficialEditor() {
+  state.editingOfficial = false;
+  attachSharedPredictionViews(els.predictionScreen, true);
+  renderGroups();
+  renderThirds();
+  renderBracket();
+  updateStatus();
+  updatePermissionState();
+}
+
+function attachSharedPredictionViews(target, includeSaveBar) {
+  if (includeSaveBar) {
+    els.predictionScreen.insertBefore(els.activePeriodBar, els.predictionScreen.firstElementChild);
+    els.predictionScreen.insertBefore(els.predictionSaveBar, els.activePeriodBar.nextSibling);
+    els.predictionScreen.insertBefore(els.saveFeedback, els.predictionSaveBar.nextSibling);
+  }
+
+  const views = [document.querySelector("#groupsView"), document.querySelector("#thirdsView"), document.querySelector("#bracketView")];
+  const tabs = document.querySelector("nav.tabs[aria-label='Etapas']");
+  target.appendChild(tabs);
+  views.forEach((view) => target.appendChild(view));
 }
 
 async function saveOfficialFromEditor() {
   if (!isAdmin()) {
     showPeriodFeedback("Apenas admin pode editar a tabela oficial.", true);
+    showOfficialFeedback("Apenas admin pode editar a tabela oficial.");
     return;
   }
 
@@ -1332,7 +1372,7 @@ async function saveOfficialFromEditor() {
 
   if (error) {
     showPeriodFeedback(`Erro ao salvar tabela oficial: ${error.message}`, true);
-    showSaveFeedback(`Erro ao salvar tabela oficial: ${error.message}`);
+    showOfficialFeedback(`Erro ao salvar tabela oficial: ${error.message}`);
     return;
   }
 
@@ -1340,8 +1380,18 @@ async function saveOfficialFromEditor() {
   renderOfficialAdmin();
   renderHome();
   renderPredictions();
-  showSaveFeedback("Tabela oficial salva. Ranking recalculado.", false);
+  showOfficialFeedback("Tabela oficial salva. Ranking recalculado.", false);
   showPeriodFeedback("Tabela oficial salva. Ranking recalculado.", false);
+}
+
+function showOfficialFeedback(message, isError = true) {
+  els.officialFeedback.textContent = message;
+  els.officialFeedback.classList.toggle("error", isError);
+}
+
+function clearOfficialFeedback() {
+  els.officialFeedback.textContent = "";
+  els.officialFeedback.classList.add("error");
 }
 
 async function createPeriod(event) {

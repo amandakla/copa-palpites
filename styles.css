@@ -610,6 +610,7 @@ h2 {
 .home-panel,
 .active-period-bar,
 .prediction-save-bar,
+.official-header,
 .official-panel,
 .admin-form,
 .admin-period-item,
@@ -757,6 +758,24 @@ h2 {
 
 .prediction-feedback {
   margin-bottom: 10px;
+}
+
+.official-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 10px;
+  padding: 16px;
+}
+
+.official-header p:not(.eyebrow) {
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.official-workspace {
+  display: contents;
 }
 
 .admin-form {
