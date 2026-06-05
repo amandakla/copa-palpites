@@ -224,7 +224,13 @@ function bindStaticEvents() {
   });
 
   document.querySelectorAll(".main-tab").forEach((tab) => {
-    tab.addEventListener("click", () => setScreen(tab.dataset.screen));
+    tab.addEventListener("click", () => {
+      if (tab.dataset.screen === "prediction") {
+        openCurrentUserPredictionTab();
+        return;
+      }
+      setScreen(tab.dataset.screen);
+    });
   });
 
   document.querySelectorAll(".tab").forEach((tab) => {
@@ -270,8 +276,8 @@ function setScreen(screen) {
   if (screen === "prediction") {
     attachSharedPredictionViews(els.predictionScreen, true);
     updateStatus();
-    updatePermissionState();
   }
+  updatePermissionState();
 }
 
 function setView(view) {
@@ -1177,6 +1183,28 @@ function openUserPredictionForPeriod(periodId) {
   setScreen("prediction");
 }
 
+function openCurrentUserPredictionTab() {
+  const preferredPeriodId = getOpenPeriod()?.id || state.activePeriodId || state.periods[0]?.id || null;
+  if (!preferredPeriodId) {
+    state.activeId = null;
+    state.editingOfficial = false;
+    state.picks = createEmptyPicks();
+    state.thirdOrder = [];
+    state.bracketWinners = {};
+    renderActivePeriodBar();
+    renderGroups();
+    renderThirds();
+    renderBracket();
+    renderPredictions();
+    clearSaveFeedback();
+    updateStatus();
+    setScreen("prediction");
+    return;
+  }
+
+  openUserPredictionForPeriod(preferredPeriodId);
+}
+
 function renderPeriodList() {
   els.periodList.innerHTML = state.periods.map((period) => {
     const status = getPeriodStatus(period);
@@ -1192,21 +1220,7 @@ function renderPeriodList() {
 
   els.periodList.querySelectorAll("[data-period-id]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.activePeriodId = button.dataset.periodId;
-      state.activeId = null;
-      state.editingOfficial = false;
-      state.picks = createEmptyPicks();
-      state.thirdOrder = [];
-      state.bracketWinners = {};
-      renderHome();
-      renderActivePeriodBar();
-      renderGroups();
-      renderThirds();
-      renderBracket();
-      renderPredictions();
-      updateStatus();
-      updatePermissionState();
-      setScreen("prediction");
+      openUserPredictionForPeriod(button.dataset.periodId);
     });
   });
 }
@@ -1866,6 +1880,7 @@ function clearSaveFeedback() {
 }
 
 function updatePermissionState() {
+  const screen = getCurrentScreen();
   const readOnly = !state.editingOfficial && isReadOnlyMode();
   const periodOpen = canCreateInActivePeriod();
   const canSave = state.editingOfficial ? isAdmin() : !readOnly && periodOpen;
@@ -1885,6 +1900,16 @@ function updatePermissionState() {
 
   if (state.editingOfficial) {
     els.editNotice.textContent = "Editando a tabela oficial. Só admin pode alterar; todos veem o ranking recalculado.";
+  } else if (screen !== "prediction") {
+    const openPeriod = getOpenPeriod();
+    const userPrediction = openPeriod ? getCurrentUserPredictionForPeriod(openPeriod.id) : null;
+    if (openPeriod && userPrediction) {
+      els.editNotice.textContent = "Você já tem um palpite neste período. Abra a aba Palpite para editar enquanto estiver aberto.";
+    } else if (openPeriod) {
+      els.editNotice.textContent = `Período aberto. Seu palpite será salvo como @${getCurrentUser().username} #1.`;
+    } else {
+      els.editNotice.textContent = "Nenhum período aberto no momento. Palpites ficam disponíveis apenas para visualização.";
+    }
   } else if (readOnly && active) {
     els.editNotice.textContent = `Visualizando @${getPredictionUsername(active)}. Você pode ver, mas não editar nem excluir.`;
   } else if (!periodOpen) {
@@ -1899,12 +1924,13 @@ function updatePermissionState() {
 function updateStatus() {
   const placements = getFinalPlacements();
   const brazil = getTeamEliminationInfo("Brasil");
+  const brazilLabel = brazil.stage === "Campeão" ? "Brasil é" : "Brasil cai em";
   els.championName.innerHTML = formatStatusTeam(placements.champion, "gold");
   els.runnerUpName.innerHTML = formatStatusTeam(placements.runnerUp, "silver");
   els.thirdPlaceName.innerHTML = formatStatusTeam(placements.thirdPlace, "bronze");
   els.fourthPlaceName.innerHTML = formatStatusTeam(placements.fourthPlace);
   els.brazilStatus.innerHTML = `
-    <small>Brasil cai em</small>
+    <small>${brazilLabel}</small>
     <span>${escapeHtml(brazil.stage)}</span>
     ${brazil.opponent ? `<em>vs ${escapeHtml(brazil.opponent)}</em>` : ""}
   `;
