@@ -129,6 +129,7 @@ const state = {
   users: [],
   periods: [],
   predictions: [],
+  officialResult: null,
   picks: createEmptyPicks(),
   thirdOrder: [],
   bracketWinners: {}
@@ -162,6 +163,8 @@ const els = {
   periodStart: document.querySelector("#periodStart"),
   periodEnd: document.querySelector("#periodEnd"),
   periodFeedback: document.querySelector("#periodFeedback"),
+  officialSummary: document.querySelector("#officialSummary"),
+  saveOfficialBtn: document.querySelector("#saveOfficialBtn"),
   savePredictionBtn: document.querySelector("#savePredictionBtn"),
   saveFeedback: document.querySelector("#saveFeedback"),
   resetBracketBtn: document.querySelector("#resetBracketBtn"),
@@ -251,6 +254,7 @@ function bindStaticEvents() {
 
   els.savePredictionBtn.addEventListener("click", saveCurrentPrediction);
   els.periodForm.addEventListener("submit", createPeriod);
+  els.saveOfficialBtn.addEventListener("click", saveOfficialFromActivePrediction);
 }
 
 function setScreen(screen) {
@@ -845,9 +849,9 @@ async function saveCurrentPrediction() {
 function renderPredictions() {
   els.predictionList.innerHTML = "";
 
-  const visiblePredictions = state.activePeriodId
+  const visiblePredictions = getRankedPredictions(state.activePeriodId
     ? state.predictions.filter((prediction) => getPredictionPeriodId(prediction) === state.activePeriodId)
-    : state.predictions;
+    : state.predictions);
 
   if (!visiblePredictions.length) {
     const empty = document.createElement("p");
@@ -857,7 +861,7 @@ function renderPredictions() {
     return;
   }
 
-  visiblePredictions.forEach((prediction) => {
+  visiblePredictions.forEach((prediction, index) => {
     const row = document.createElement("div");
     row.className = `prediction-item ${prediction.id === state.activeId ? "active" : ""}`;
 
@@ -865,9 +869,13 @@ function renderPredictions() {
     loadButton.type = "button";
     loadButton.className = "prediction-load";
     const owner = getPredictionUsername(prediction);
+    const ranking = getPredictionScore(prediction);
     loadButton.innerHTML = `
-      <strong>${escapeHtml(prediction.name)}</strong>
-      <small>${escapeHtml(getPeriodTitle(getPredictionPeriodId(prediction)))} · ${escapeHtml(prediction.savedAt)} · @${escapeHtml(owner)}</small>
+      <span class="rank-line">
+        <span class="rank-medal ${getRankClass(index)}">${getRankIcon(index)}</span>
+        <strong>${escapeHtml(prediction.name)}</strong>
+      </span>
+      <small>${ranking.score} pts · ${escapeHtml(getPeriodTitle(getPredictionPeriodId(prediction)))} · ${escapeHtml(prediction.createdAt)} · @${escapeHtml(owner)}</small>
     `;
     loadButton.addEventListener("click", () => loadPrediction(prediction.id));
 
@@ -927,11 +935,12 @@ async function deletePrediction(id) {
 }
 
 async function refreshAppData() {
-  await Promise.all([loadUsers(), loadPeriods(), loadPredictions()]);
+  await Promise.all([loadUsers(), loadPeriods(), loadPredictions(), loadOfficialResult()]);
   selectDefaultPeriod();
   renderAuthState();
   renderHome();
   renderAdminPeriods();
+  renderOfficialAdmin();
   renderActivePeriodBar();
   renderGroups();
   renderThirds();
@@ -955,6 +964,21 @@ async function loadPredictions() {
   }
 
   state.predictions = data.map(mapPrediction);
+}
+
+async function loadOfficialResult() {
+  const { data, error } = await db
+    .from("official_results")
+    .select("*")
+    .eq("id", "current")
+    .maybeSingle();
+
+  if (error) {
+    state.officialResult = createEmptyOfficialResult();
+    return;
+  }
+
+  state.officialResult = data ? mapOfficialResult(data) : createEmptyOfficialResult();
 }
 
 async function loadPeriods() {
@@ -1010,10 +1034,32 @@ function mapPrediction(prediction) {
     name: prediction.name,
     savedAt: formatDateTime(prediction.updated_at || prediction.created_at),
     savedAtISO: prediction.updated_at || prediction.created_at,
+    createdAt: formatDateTime(prediction.created_at),
+    createdAtISO: prediction.created_at,
     picks: prediction.picks,
     thirdOrder: prediction.third_place_order || [],
     bracketWinners: prediction.bracket_winners,
     champion: prediction.champion
+  };
+}
+
+function createEmptyOfficialResult() {
+  return {
+    picks: createEmptyPicks(),
+    thirdOrder: [],
+    bracketWinners: {},
+    champion: null,
+    updatedAt: null
+  };
+}
+
+function mapOfficialResult(result) {
+  return {
+    picks: result.picks || createEmptyPicks(),
+    thirdOrder: result.third_place_order || [],
+    bracketWinners: result.bracket_winners || {},
+    champion: result.champion || null,
+    updatedAt: result.updated_at || null
   };
 }
 
@@ -1137,8 +1183,7 @@ function renderPeriodList() {
 }
 
 function renderFeed() {
-  const items = [...state.predictions]
-    .sort((a, b) => new Date(b.savedAtISO || 0) - new Date(a.savedAtISO || 0))
+  const items = getRankedPredictions(state.predictions)
     .slice(0, 12);
 
   if (!items.length) {
@@ -1146,14 +1191,15 @@ function renderFeed() {
     return;
   }
 
-  els.feedList.innerHTML = items.map((prediction) => {
+  els.feedList.innerHTML = items.map((prediction, index) => {
     const champion = prediction.bracketWinners?.["final-0"]?.team || "-";
+    const ranking = getPredictionScore(prediction);
     return `
-      <button class="feed-item" type="button" data-prediction-id="${escapeHtml(prediction.id)}">
-        <span class="avatar">${getPredictionUsername(prediction).slice(0, 1).toUpperCase()}</span>
+      <button class="feed-item rank-${index + 1}" type="button" data-prediction-id="${escapeHtml(prediction.id)}">
+        <span class="rank-medal ${getRankClass(index)}">${getRankIcon(index)}</span>
         <span>
           <strong>${escapeHtml(prediction.name)}</strong>
-          <small>${escapeHtml(getPeriodTitle(getPredictionPeriodId(prediction)))} · campeão: ${escapeHtml(champion)} · ${escapeHtml(prediction.savedAt)}</small>
+          <small>${ranking.score} pts · campeão: ${escapeHtml(champion)} · enviado em ${escapeHtml(prediction.createdAt)}</small>
         </span>
       </button>
     `;
@@ -1190,6 +1236,68 @@ function renderAdminPeriods() {
       <small>${formatDateTime(period.startsAt)} até ${formatDateTime(period.endsAt)}</small>
     </article>
   `).join("");
+}
+
+function renderOfficialAdmin() {
+  const official = state.officialResult || createEmptyOfficialResult();
+  const officialMatches = Object.keys(official.bracketWinners || {}).length;
+  const officialGroups = (official.picks || []).filter((pick) => pick.first || pick.second || pick.third).length;
+  const champion = official.champion || official.bracketWinners?.["final-0"]?.team || "-";
+  const updated = official.updatedAt ? formatDateTime(official.updatedAt) : "ainda não preenchida";
+
+  els.officialSummary.innerHTML = `
+    <div class="official-card">
+      <span>Grupos oficiais</span>
+      <strong>${officialGroups}/12</strong>
+    </div>
+    <div class="official-card">
+      <span>Jogos oficiais</span>
+      <strong>${officialMatches}/31</strong>
+    </div>
+    <div class="official-card">
+      <span>Campeão oficial</span>
+      <strong>${escapeHtml(champion)}</strong>
+    </div>
+    <div class="official-card wide">
+      <span>Última atualização</span>
+      <strong>${escapeHtml(updated)}</strong>
+      <small>Quando a Copa começar, você preenche a tabela oficial aqui e o ranking recalcula os palpites.</small>
+    </div>
+  `;
+}
+
+async function saveOfficialFromActivePrediction() {
+  if (!isAdmin()) {
+    showPeriodFeedback("Apenas admin pode editar a tabela oficial.", true);
+    return;
+  }
+
+  const row = {
+    id: "current",
+    picks: structuredClone(state.picks),
+    third_place_order: structuredClone(state.thirdOrder),
+    bracket_winners: structuredClone(state.bracketWinners),
+    champion: state.bracketWinners["final-0"]?.team || null,
+    updated_by: getCurrentUser().id,
+    updated_at: new Date().toISOString()
+  };
+
+  const { data, error } = await db
+    .from("official_results")
+    .upsert(row)
+    .select("*")
+    .single();
+
+  if (error) {
+    showPeriodFeedback(`Erro ao salvar tabela oficial: ${error.message}`, true);
+    return;
+  }
+
+  state.officialResult = mapOfficialResult(data);
+  renderOfficialAdmin();
+  renderHome();
+  renderPredictions();
+  showPeriodFeedback("Tabela oficial salva. Ranking recalculado.", false);
 }
 
 async function createPeriod(event) {
@@ -1464,6 +1572,57 @@ function getPredictionUsername(prediction) {
   if (prediction.username) return prediction.username;
   const user = state.users.find((item) => item.id === prediction.userId);
   return user?.username || prediction.userName || "usuario";
+}
+
+function getRankedPredictions(predictions) {
+  return [...predictions].sort((a, b) => {
+    const scoreDiff = getPredictionScore(b).score - getPredictionScore(a).score;
+    if (scoreDiff) return scoreDiff;
+    return new Date(a.createdAtISO || a.savedAtISO || 0) - new Date(b.createdAtISO || b.savedAtISO || 0);
+  });
+}
+
+function getPredictionScore(prediction) {
+  const official = state.officialResult || createEmptyOfficialResult();
+  let score = 0;
+  const details = [];
+
+  (official.picks || []).forEach((officialPick, index) => {
+    const pick = prediction.picks?.[index] || {};
+    if (officialPick.first && pick.first === officialPick.first) score += 3;
+    if (officialPick.second && pick.second === officialPick.second) score += 2;
+    if (officialPick.third && pick.third === officialPick.third) score += 1;
+  });
+
+  const officialTopThirds = (official.thirdOrder || []).slice(0, 8);
+  const predictionTopThirds = (prediction.thirdOrder || []).slice(0, 8);
+  officialTopThirds.forEach((label, index) => {
+    if (predictionTopThirds.includes(label)) score += 2;
+    if (predictionTopThirds[index] === label) score += 1;
+  });
+
+  const weights = { r32: 4, r16: 6, qf: 8, sf: 12, final: 20 };
+  Object.entries(official.bracketWinners || {}).forEach(([matchId, officialWinner]) => {
+    const predictedWinner = prediction.bracketWinners?.[matchId];
+    if (!officialWinner?.team || predictedWinner?.team !== officialWinner.team) return;
+    const roundKey = matchId.split("-")[0];
+    score += weights[roundKey] || 0;
+  });
+
+  details.push(`${score} ponto(s)`);
+  return { score, details };
+}
+
+function getRankClass(index) {
+  if (index === 0) return "gold";
+  if (index === 1) return "silver";
+  if (index === 2) return "bronze";
+  return "default";
+}
+
+function getRankIcon(index) {
+  if (index < 3) return "♛";
+  return `${index + 1}`;
 }
 
 function canEditPrediction(prediction) {

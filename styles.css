@@ -339,12 +339,48 @@ select {
 }
 
 .prediction-load {
+  display: grid;
+  gap: 4px;
   min-width: 0;
   border: 0;
   background: transparent;
   color: inherit;
   padding: 0;
   text-align: left;
+}
+
+.rank-line {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.rank-medal {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #eef1f4;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.rank-medal.gold {
+  background: #d6a12d;
+  color: #fff;
+}
+
+.rank-medal.silver {
+  background: #aab4c1;
+  color: #fff;
+}
+
+.rank-medal.bronze {
+  background: #b87945;
+  color: #fff;
 }
 
 .prediction-item strong {
@@ -544,8 +580,11 @@ h2 {
 .period-hero,
 .home-panel,
 .active-period-bar,
+.prediction-save-bar,
+.official-panel,
 .admin-form,
-.admin-period-item {
+.admin-period-item,
+.official-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.78);
@@ -611,6 +650,19 @@ h2 {
   align-items: center;
 }
 
+.feed-item.rank-1 {
+  border-color: rgba(214, 161, 45, 0.68);
+  background: linear-gradient(135deg, #fff, #fff7df);
+}
+
+.feed-item.rank-2 {
+  border-color: rgba(170, 180, 193, 0.78);
+}
+
+.feed-item.rank-3 {
+  border-color: rgba(184, 121, 69, 0.62);
+}
+
 .period-item strong,
 .feed-item strong,
 .admin-period-item strong {
@@ -659,6 +711,25 @@ h2 {
   color: var(--muted);
 }
 
+.prediction-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+  padding: 12px;
+}
+
+.prediction-save-bar p {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 3px;
+}
+
+.prediction-feedback {
+  margin-bottom: 10px;
+}
+
 .admin-form {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(190px, 0.7fr)) 150px;
@@ -685,6 +756,41 @@ h2 {
   display: grid;
   gap: 6px;
   padding: 12px;
+}
+
+.official-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 16px;
+}
+
+.official-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.official-card {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+}
+
+.official-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.official-card strong {
+  color: var(--ink);
+  font-size: 20px;
+}
+
+.official-card small {
+  color: var(--muted);
 }
 
 .groups-grid {
@@ -1114,8 +1220,14 @@ h2 {
   }
 
   .home-grid,
-  .admin-form {
+  .admin-form,
+  .official-summary {
     grid-template-columns: 1fr;
+  }
+
+  .prediction-save-bar {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

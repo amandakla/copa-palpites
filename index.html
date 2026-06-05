@@ -66,22 +66,17 @@
           Novo palpite
         </button>
 
-        <div class="user-panel">
-          <label>Conta</label>
-          <div class="account-card">
-            <span class="avatar" id="accountAvatar">A</span>
-            <div>
-              <strong id="accountUsername">@amanda</strong>
-              <small id="accountRole">usuário</small>
+          <div class="user-panel">
+            <label>Conta</label>
+            <div class="account-card">
+              <span class="avatar" id="accountAvatar">A</span>
+              <div>
+                <strong id="accountUsername">@amanda</strong>
+                <small id="accountRole">usuário</small>
+              </div>
             </div>
+            <p class="helper-text" id="editNotice">Palpites salvos como @username + número do palpite.</p>
           </div>
-          <button id="savePredictionBtn" class="primary-action save-full" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h13l1 1v15H5V4Z"/><path d="M8 4v6h9"/><path d="M8 19v-6h8v6"/></svg>
-            Salvar palpite
-          </button>
-          <p class="feedback error" id="saveFeedback" aria-live="polite"></p>
-          <p class="helper-text" id="editNotice">Palpites salvos como @username + número do palpite.</p>
-        </div>
 
         <div class="prediction-list" id="predictionList"></div>
       </aside>
@@ -140,8 +135,8 @@
             <section class="home-panel">
               <div class="section-heading compact">
                 <div>
-                  <h2>Mural</h2>
-                  <p>Resumo público dos palpites salvos.</p>
+                  <h2>Ranking</h2>
+                  <p>Palpites ordenados por pontuação oficial e desempate por envio.</p>
                 </div>
               </div>
               <div class="feed-list" id="feedList"></div>
@@ -151,6 +146,17 @@
 
         <section class="screen" id="predictionScreen" aria-label="Criar palpite">
           <div class="active-period-bar" id="activePeriodBar"></div>
+          <div class="prediction-save-bar">
+            <div>
+              <strong>Salvar palpite</strong>
+              <p>O palpite precisa estar completo: grupos, terceiros, chave e campeão.</p>
+            </div>
+            <button id="savePredictionBtn" class="primary-action save-full" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h13l1 1v15H5V4Z"/><path d="M8 4v6h9"/><path d="M8 19v-6h8v6"/></svg>
+              Salvar palpite
+            </button>
+          </div>
+          <p class="feedback error prediction-feedback" id="saveFeedback" aria-live="polite"></p>
         <nav class="tabs" aria-label="Etapas">
           <button class="tab active" type="button" data-view="groups">Grupos</button>
           <button class="tab" type="button" data-view="thirds">Terceiros</button>
@@ -225,6 +231,20 @@
           </form>
           <p class="feedback" id="periodFeedback" aria-live="polite"></p>
           <div class="admin-period-list" id="adminPeriodList"></div>
+
+          <section class="official-panel">
+            <div class="section-heading compact">
+              <div>
+                <h2>Tabela oficial</h2>
+                <p>Resultados reais usados para calcular o ranking quando a Copa começar.</p>
+              </div>
+            </div>
+            <div class="official-summary" id="officialSummary"></div>
+            <button class="secondary-action" id="saveOfficialBtn" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h13l1 1v15H5V4Z"/><path d="M8 4v6h9"/><path d="M8 19v-6h8v6"/></svg>
+              Salvar palpite atual como oficial
+            </button>
+          </section>
         </section>
       </main>
     </div>

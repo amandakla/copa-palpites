@@ -30,6 +30,16 @@ create table if not exists public.predictions (
   unique (user_id, period_id, prediction_number)
 );
 
+create table if not exists public.official_results (
+  id text primary key default 'current' check (id = 'current'),
+  picks jsonb not null default '[]'::jsonb,
+  third_place_order jsonb not null default '[]'::jsonb,
+  bracket_winners jsonb not null default '{}'::jsonb,
+  champion text,
+  updated_by uuid references public.profiles(id),
+  updated_at timestamptz not null default now()
+);
+
 alter table public.predictions
 add column if not exists third_place_order jsonb not null default '[]'::jsonb;
 
@@ -76,6 +86,7 @@ $$;
 alter table public.profiles enable row level security;
 alter table public.prediction_periods enable row level security;
 alter table public.predictions enable row level security;
+alter table public.official_results enable row level security;
 
 drop policy if exists "profiles are public readable" on public.profiles;
 drop policy if exists "users can insert own profile" on public.profiles;
@@ -86,6 +97,8 @@ drop policy if exists "predictions are public readable" on public.predictions;
 drop policy if exists "users can insert own predictions in open periods" on public.predictions;
 drop policy if exists "users can update own predictions in open periods" on public.predictions;
 drop policy if exists "users can delete own predictions in open periods" on public.predictions;
+drop policy if exists "official results are public readable" on public.official_results;
+drop policy if exists "admins can manage official results" on public.official_results;
 
 create policy "profiles are public readable"
 on public.profiles for select
@@ -158,5 +171,26 @@ using (
     select 1 from public.prediction_periods
     where prediction_periods.id = period_id
       and now() between prediction_periods.starts_at and prediction_periods.ends_at
+  )
+);
+
+create policy "official results are public readable"
+on public.official_results for select
+using (true);
+
+create policy "admins can manage official results"
+on public.official_results for all
+using (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = auth.uid()
+      and profiles.role = 'admin'
+  )
+)
+with check (
+  exists (
+    select 1 from public.profiles
+    where profiles.id = auth.uid()
+      and profiles.role = 'admin'
   )
 );
