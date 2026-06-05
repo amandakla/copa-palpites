@@ -29,6 +29,33 @@ create table if not exists public.predictions (
   unique (user_id, period_id, prediction_number)
 );
 
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  requested_username text;
+begin
+  requested_username := lower(regexp_replace(coalesce(new.raw_user_meta_data->>'username', ''), '[^a-z0-9._]', '', 'g'));
+
+  if char_length(requested_username) < 3 then
+    raise exception 'username must have at least 3 characters';
+  end if;
+
+  insert into public.profiles (id, username, role)
+  values (new.id, requested_username, 'user');
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute function public.handle_new_user();
+
 alter table public.profiles enable row level security;
 alter table public.prediction_periods enable row level security;
 alter table public.predictions enable row level security;
@@ -49,12 +76,7 @@ using (true);
 
 create policy "users can insert own profile"
 on public.profiles for insert
-with check (id = auth.uid());
-
-create policy "users can update own profile"
-on public.profiles for update
-using (id = auth.uid())
-with check (id = auth.uid());
+with check (id = auth.uid() and role = 'user');
 
 create policy "periods are public readable"
 on public.prediction_periods for select

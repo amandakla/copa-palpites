@@ -13,17 +13,17 @@ const groups = [
   ["Inglaterra", "Croácia", "Gana", "Panamá"]
 ];
 
-const STORAGE_KEY = "copa-palpites-v3";
-const USERS_KEY = "copa-palpites-users-v1";
-const PERIODS_KEY = "copa-palpites-periods-v1";
-const SESSION_KEY = "copa-palpites-session-v1";
-
-const defaultUsers = [
-  { id: "amanda", username: "amanda" },
-  { id: "bruno", username: "bruno" },
-  { id: "carol", username: "carol" },
-  { id: "diego", username: "diego" }
-];
+const supabaseConfig = window.COPA_SUPABASE || {};
+const hasSupabaseConfig = Boolean(
+  window.supabase &&
+  supabaseConfig.url &&
+  supabaseConfig.anonKey &&
+  !supabaseConfig.url.startsWith("COLE_AQUI") &&
+  !supabaseConfig.anonKey.startsWith("COLE_AQUI")
+);
+const db = hasSupabaseConfig
+  ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey)
+  : null;
 
 const flags = {
   "Alemanha": "🇩🇪",
@@ -96,6 +96,9 @@ const state = {
   activeId: null,
   activePeriodId: null,
   currentUserId: null,
+  currentUser: null,
+  currentProfile: null,
+  authMode: "login",
   users: [],
   periods: [],
   predictions: [],
@@ -108,10 +111,14 @@ const els = {
   authScreen: document.querySelector("#authScreen"),
   authForm: document.querySelector("#authForm"),
   authUsername: document.querySelector("#authUsername"),
+  authEmail: document.querySelector("#authEmail"),
+  authPassword: document.querySelector("#authPassword"),
+  authSubmitBtn: document.querySelector("#authSubmitBtn"),
   authFeedback: document.querySelector("#authFeedback"),
   logoutBtn: document.querySelector("#logoutBtn"),
   accountAvatar: document.querySelector("#accountAvatar"),
   accountUsername: document.querySelector("#accountUsername"),
+  accountRole: document.querySelector("#accountRole"),
   groupsGrid: document.querySelector("#groupsGrid"),
   bracket: document.querySelector("#bracket"),
   periodHero: document.querySelector("#periodHero"),
@@ -126,7 +133,6 @@ const els = {
   periodFeedback: document.querySelector("#periodFeedback"),
   savePredictionBtn: document.querySelector("#savePredictionBtn"),
   saveFeedback: document.querySelector("#saveFeedback"),
-  autoFillBtn: document.querySelector("#autoFillBtn"),
   resetBracketBtn: document.querySelector("#resetBracketBtn"),
   editNotice: document.querySelector("#editNotice"),
   predictionList: document.querySelector("#predictionList"),
@@ -143,24 +149,21 @@ function groupLabel(index) {
   return String.fromCharCode(65 + index);
 }
 
-function init() {
-  loadUsers();
-  loadSession();
-  loadPeriods();
-  selectDefaultPeriod();
-  loadPredictions();
+async function init() {
   setPeriodFormDefaults();
   bindStaticEvents();
+  setAuthMode("login");
+
+  if (!db) {
+    renderAuthState();
+    showAuthFeedback("Configure o Supabase em supabase-config.js para entrar.", true);
+    return;
+  }
+
+  await loadSession();
   renderAuthState();
   if (!state.currentUserId) return;
-  renderHome();
-  renderAdminPeriods();
-  renderActivePeriodBar();
-  renderGroups();
-  renderBracket();
-  renderPredictions();
-  updateStatus();
-  updatePermissionState();
+  await refreshAppData();
 }
 
 function setPeriodFormDefaults() {
@@ -173,6 +176,9 @@ function setPeriodFormDefaults() {
 function bindStaticEvents() {
   els.authForm.addEventListener("submit", handleAuthSubmit);
   els.logoutBtn.addEventListener("click", logout);
+  document.querySelectorAll("[data-auth-mode]").forEach((button) => {
+    button.addEventListener("click", () => setAuthMode(button.dataset.authMode));
+  });
 
   document.querySelectorAll(".main-tab").forEach((tab) => {
     tab.addEventListener("click", () => setScreen(tab.dataset.screen));
@@ -180,20 +186,6 @@ function bindStaticEvents() {
 
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.addEventListener("click", () => setView(tab.dataset.view));
-  });
-
-  els.autoFillBtn.addEventListener("click", () => {
-    if (isReadOnlyMode() || !canCreateInActivePeriod()) return;
-    state.picks = groups.map((teams) => ({
-      first: teams[0],
-      second: teams[1],
-      third: teams[2]
-    }));
-    state.bracketWinners = {};
-    renderGroups();
-    renderBracket();
-    clearSaveFeedback();
-    updateStatus();
   });
 
   els.resetBracketBtn.addEventListener("click", () => {
@@ -227,6 +219,10 @@ function bindStaticEvents() {
 }
 
 function setScreen(screen) {
+  if (screen === "admin" && !isAdmin()) {
+    screen = "home";
+  }
+
   document.querySelectorAll(".main-tab").forEach((tab) => {
     tab.classList.toggle("active", tab.dataset.screen === screen);
   });
@@ -242,6 +238,27 @@ function setView(view) {
   document.querySelectorAll(".view").forEach((section) => {
     section.classList.toggle("active", section.id === `${view}View`);
   });
+}
+
+function setAuthMode(mode) {
+  state.authMode = mode === "signup" ? "signup" : "login";
+  document.querySelectorAll("[data-auth-mode]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.authMode === state.authMode);
+  });
+  document.querySelectorAll(".signup-only").forEach((node) => {
+    node.classList.toggle("is-hidden", state.authMode !== "signup");
+  });
+  els.authSubmitBtn.textContent = state.authMode === "signup" ? "Criar conta" : "Entrar";
+  els.authPassword.autocomplete = state.authMode === "signup" ? "new-password" : "current-password";
+  els.authFeedback.textContent = "";
+}
+
+function getCurrentScreen() {
+  return document.querySelector(".main-tab.active")?.dataset.screen || "home";
+}
+
+function isAdmin() {
+  return state.currentProfile?.role === "admin";
 }
 
 function renderGroups() {
@@ -542,7 +559,7 @@ function clearForwardRounds(roundKey, matchIndex) {
   }
 }
 
-function saveCurrentPrediction() {
+async function saveCurrentPrediction() {
   if (isReadOnlyMode()) return;
 
   if (!canCreateInActivePeriod()) {
@@ -560,28 +577,44 @@ function saveCurrentPrediction() {
   const user = getCurrentUser();
   const sequence = getNextPredictionNumber(user.id);
   const number = state.activeId ? getActivePredictionNumber() : sequence;
-  const data = {
-    id: state.activeId || createId(),
-    userId: user.id,
-    username: user.username,
-    periodId: state.activePeriodId,
-    number,
+  const row = {
+    user_id: user.id,
+    period_id: state.activePeriodId,
+    prediction_number: number,
     name: `@${user.username} #${number}`,
-    savedAt: now.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }),
-    savedAtISO: now.toISOString(),
     picks: structuredClone(state.picks),
-    bracketWinners: structuredClone(state.bracketWinners)
+    bracket_winners: structuredClone(state.bracketWinners),
+    champion: state.bracketWinners["final-0"].team,
+    updated_at: now.toISOString()
   };
 
-  const existingIndex = state.predictions.findIndex((item) => item.id === data.id);
-  if (existingIndex >= 0) {
-    state.predictions[existingIndex] = data;
+  let result;
+  if (state.activeId) {
+    result = await db
+      .from("predictions")
+      .update(row)
+      .eq("id", state.activeId)
+      .select("*, profiles(username), prediction_periods(title)")
+      .single();
   } else {
-    state.predictions.unshift(data);
+    result = await db
+      .from("predictions")
+      .insert(row)
+      .select("*, profiles(username), prediction_periods(title)")
+      .single();
   }
 
-  state.activeId = data.id;
-  persistPredictions();
+  if (result.error) {
+    showSaveFeedback(`Erro ao salvar: ${result.error.message}`);
+    return;
+  }
+
+  const saved = mapPrediction(result.data);
+  const existingIndex = state.predictions.findIndex((item) => item.id === saved.id);
+  if (existingIndex >= 0) state.predictions[existingIndex] = saved;
+  else state.predictions.unshift(saved);
+
+  state.activeId = saved.id;
   renderHome();
   renderActivePeriodBar();
   renderPredictions();
@@ -653,80 +686,111 @@ function loadPrediction(id) {
   clearSaveFeedback();
 }
 
-function deletePrediction(id) {
+async function deletePrediction(id) {
   const prediction = state.predictions.find((item) => item.id === id);
   if (!prediction || !canEditPrediction(prediction)) return;
 
+  const { error } = await db.from("predictions").delete().eq("id", id);
+  if (error) {
+    showSaveFeedback(`Erro ao excluir: ${error.message}`);
+    return;
+  }
+
   state.predictions = state.predictions.filter((item) => item.id !== id);
   if (state.activeId === id) state.activeId = null;
-  persistPredictions();
   renderHome();
   renderActivePeriodBar();
   renderPredictions();
   updatePermissionState();
 }
 
-function loadPredictions() {
-  try {
-    state.predictions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch {
+async function refreshAppData() {
+  await Promise.all([loadUsers(), loadPeriods(), loadPredictions()]);
+  selectDefaultPeriod();
+  renderAuthState();
+  renderHome();
+  renderAdminPeriods();
+  renderActivePeriodBar();
+  renderGroups();
+  renderBracket();
+  renderPredictions();
+  updateStatus();
+  updatePermissionState();
+  setScreen(isAdmin() ? getCurrentScreen() : "home");
+}
+
+async function loadPredictions() {
+  const { data, error } = await db
+    .from("predictions")
+    .select("*, profiles(username), prediction_periods(title)")
+    .order("created_at", { ascending: false });
+
+  if (error) {
     state.predictions = [];
+    showSaveFeedback(`Erro ao carregar palpites: ${error.message}`);
+    return;
   }
 
-  if (!state.predictions.length) {
-    state.predictions = createMockPredictions();
-    persistPredictions();
-  }
-
-  state.predictions = state.predictions.map((prediction) => ({
-    ...prediction,
-    periodId: getPredictionPeriodId(prediction)
-  }));
+  state.predictions = data.map(mapPrediction);
 }
 
-function persistPredictions() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.predictions));
-}
+async function loadPeriods() {
+  const { data, error } = await db
+    .from("prediction_periods")
+    .select("*")
+    .order("starts_at", { ascending: false });
 
-function loadPeriods() {
-  try {
-    state.periods = JSON.parse(localStorage.getItem(PERIODS_KEY) || "[]");
-  } catch {
+  if (error) {
     state.periods = [];
+    showPeriodFeedback(`Erro ao carregar períodos: ${error.message}`, true);
+    return;
   }
 
-  if (!state.periods.length) {
-    state.periods = createMockPeriods();
-    persistPeriods();
+  state.periods = data.map(mapPeriod);
+}
+
+async function loadUsers() {
+  const { data, error } = await db
+    .from("profiles")
+    .select("id, username, role")
+    .order("username", { ascending: true });
+
+  if (error) {
+    state.users = [];
+    showAuthFeedback(`Erro ao carregar usuários: ${error.message}`, true);
+    return;
   }
+
+  state.users = data;
+  state.currentProfile = state.users.find((user) => user.id === state.currentUserId) || null;
 }
 
-function persistPeriods() {
-  localStorage.setItem(PERIODS_KEY, JSON.stringify(state.periods));
+function mapPeriod(period) {
+  return {
+    id: period.id,
+    title: period.title,
+    startsAt: period.starts_at,
+    endsAt: period.ends_at,
+    createdBy: period.created_by,
+    createdAt: period.created_at
+  };
 }
 
-function createMockPeriods() {
-  const now = new Date();
-  return [
-    {
-      id: "fase-grupos",
-      title: "Palpites da fase de grupos",
-      startsAt: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
-      endsAt: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: "oitavas",
-      title: "Palpites das oitavas",
-      startsAt: new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString(),
-      endsAt: new Date(now.getTime() + 11 * 24 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: "teste-encerrado",
-      title: "Rodada teste encerrada",
-      startsAt: new Date(now.getTime() - 9 * 24 * 60 * 60 * 1000).toISOString(),
-      endsAt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    }
-  ];
+function mapPrediction(prediction) {
+  const username = prediction.profiles?.username || "usuario";
+  return {
+    id: prediction.id,
+    userId: prediction.user_id,
+    username,
+    periodId: prediction.period_id,
+    number: prediction.prediction_number,
+    name: prediction.name,
+    savedAt: formatDateTime(prediction.updated_at || prediction.created_at),
+    savedAtISO: prediction.updated_at || prediction.created_at,
+    picks: prediction.picks,
+    bracketWinners: prediction.bracket_winners,
+    champion: prediction.champion
+  };
 }
 
 function selectDefaultPeriod() {
@@ -763,7 +827,7 @@ function getPeriodTitle(periodId) {
 }
 
 function getPredictionPeriodId(prediction) {
-  return prediction.periodId || state.periods[0]?.id || "fase-grupos";
+  return prediction.periodId || null;
 }
 
 function canCreateInActivePeriod() {
@@ -900,8 +964,13 @@ function renderAdminPeriods() {
   `).join("");
 }
 
-function createPeriod(event) {
+async function createPeriod(event) {
   event.preventDefault();
+  if (!isAdmin()) {
+    showPeriodFeedback("Apenas admin pode criar períodos.", true);
+    return;
+  }
+
   const title = els.periodTitle.value.trim();
   const startsAt = els.periodStart.value;
   const endsAt = els.periodEnd.value;
@@ -916,14 +985,24 @@ function createPeriod(event) {
     return;
   }
 
-  state.periods.unshift({
-    id: createSlug(title),
-    title,
-    startsAt: new Date(startsAt).toISOString(),
-    endsAt: new Date(endsAt).toISOString()
-  });
-  persistPeriods();
-  selectDefaultPeriod();
+  const { data, error } = await db
+    .from("prediction_periods")
+    .insert({
+      title,
+      starts_at: new Date(startsAt).toISOString(),
+      ends_at: new Date(endsAt).toISOString(),
+      created_by: getCurrentUser().id
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    showPeriodFeedback(`Erro ao criar período: ${error.message}`, true);
+    return;
+  }
+
+  state.periods.unshift(mapPeriod(data));
+  state.activePeriodId = data.id;
   renderHome();
   renderAdminPeriods();
   renderActivePeriodBar();
@@ -937,10 +1016,6 @@ function showPeriodFeedback(message, isError) {
   els.periodFeedback.classList.toggle("error", isError);
 }
 
-function createSlug(value) {
-  return `${normalizeUsername(value).replaceAll(".", "-").replaceAll("_", "-")}-${Date.now().toString(36)}`;
-}
-
 function formatDateTime(value) {
   return new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
@@ -950,34 +1025,17 @@ function toDatetimeLocal(date) {
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
-function loadUsers() {
-  try {
-    state.users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-  } catch {
-    state.users = [];
+async function loadSession() {
+  const { data, error } = await db.auth.getSession();
+  if (error || !data.session?.user) {
+    state.currentUser = null;
+    state.currentUserId = null;
+    state.currentProfile = null;
+    return;
   }
 
-  if (!state.users.length) {
-    state.users = structuredClone(defaultUsers);
-    persistUsers();
-  }
-}
-
-function persistUsers() {
-  localStorage.setItem(USERS_KEY, JSON.stringify(state.users));
-}
-
-function loadSession() {
-  const savedUserId = localStorage.getItem(SESSION_KEY);
-  state.currentUserId = state.users.some((user) => user.id === savedUserId) ? savedUserId : null;
-}
-
-function persistSession() {
-  if (state.currentUserId) {
-    localStorage.setItem(SESSION_KEY, state.currentUserId);
-  } else {
-    localStorage.removeItem(SESSION_KEY);
-  }
+  state.currentUser = data.session.user;
+  state.currentUserId = data.session.user.id;
 }
 
 function renderAuthState() {
@@ -986,55 +1044,92 @@ function renderAuthState() {
   els.appShell.classList.toggle("is-hidden", !isLoggedIn);
 
   if (!isLoggedIn) {
-    els.authUsername.focus();
+    document.querySelectorAll(".admin-only").forEach((node) => {
+      node.classList.add("is-hidden");
+    });
+    els.authEmail.focus();
     return;
   }
 
   const user = getCurrentUser();
   els.accountUsername.textContent = `@${user.username}`;
   els.accountAvatar.textContent = user.username.slice(0, 1).toUpperCase();
+  els.accountRole.textContent = isAdmin() ? "admin" : "usuário";
+  document.querySelectorAll(".admin-only").forEach((node) => {
+    node.classList.toggle("is-hidden", !isAdmin());
+  });
 }
 
-function handleAuthSubmit(event) {
+async function handleAuthSubmit(event) {
   event.preventDefault();
+  if (!db) {
+    showAuthFeedback("Configure o Supabase em supabase-config.js para entrar.", true);
+    return;
+  }
+
+  const email = els.authEmail.value.trim();
+  const password = els.authPassword.value;
   const username = normalizeUsername(els.authUsername.value);
   els.authFeedback.className = "feedback";
 
-  if (username.length < 3) {
+  if (!email || !password) {
+    showAuthFeedback("Preencha email e senha.", true);
+    return;
+  }
+
+  if (state.authMode === "signup" && username.length < 3) {
     showAuthFeedback("Use um username com pelo menos 3 caracteres.", true);
     return;
   }
 
-  let user = state.users.find((item) => item.username === username);
+  if (state.authMode === "signup") {
+    const exists = await db.from("profiles").select("id").eq("username", username).maybeSingle();
+    if (exists.data) {
+      showAuthFeedback(`@${username} já está em uso.`, true);
+      return;
+    }
 
-  if (!user) {
-    user = { id: username, username };
-    state.users.push(user);
-    persistUsers();
+    const { data, error } = await db.auth.signUp({
+      email,
+      password,
+      options: { data: { username } }
+    });
+
+    if (error) {
+      showAuthFeedback(`Erro ao criar conta: ${error.message}`, true);
+      return;
+    }
+
+    if (!data.session) {
+      showAuthFeedback("Conta criada. Confirme o email e depois entre.", false);
+      setAuthMode("login");
+      return;
+    }
+  } else {
+    const { error } = await db.auth.signInWithPassword({ email, password });
+    if (error) {
+      showAuthFeedback(`Erro ao entrar: ${error.message}`, true);
+      return;
+    }
   }
 
-  state.currentUserId = user.id;
-  persistSession();
+  await loadSession();
   els.authUsername.value = "";
+  els.authEmail.value = "";
+  els.authPassword.value = "";
   els.authFeedback.textContent = "";
   renderAuthState();
-  renderHome();
-  renderAdminPeriods();
-  renderActivePeriodBar();
-  renderGroups();
-  renderBracket();
-  renderPredictions();
-  updateStatus();
-  updatePermissionState();
-  setScreen("home");
+  await refreshAppData();
 }
 
-function logout() {
+async function logout() {
+  if (db) await db.auth.signOut();
   state.currentUserId = null;
+  state.currentUser = null;
+  state.currentProfile = null;
   state.activeId = null;
   state.picks = createEmptyPicks();
   state.bracketWinners = {};
-  persistSession();
   clearSaveFeedback();
   renderAuthState();
 }
@@ -1055,7 +1150,11 @@ function showAuthFeedback(message, isError) {
 }
 
 function getCurrentUser() {
-  return state.users.find((user) => user.id === state.currentUserId) || state.users[0];
+  return state.currentProfile || state.users.find((user) => user.id === state.currentUserId) || {
+    id: state.currentUserId,
+    username: "usuario",
+    role: "user"
+  };
 }
 
 function getNextPredictionNumber(userId) {
@@ -1141,7 +1240,6 @@ function updatePermissionState() {
   const readOnly = isReadOnlyMode();
   const periodOpen = canCreateInActivePeriod();
   els.savePredictionBtn.disabled = readOnly || !periodOpen;
-  els.autoFillBtn.disabled = readOnly || !periodOpen;
   els.resetBracketBtn.disabled = readOnly || !periodOpen;
 
   const active = getActivePrediction();
@@ -1152,46 +1250,6 @@ function updatePermissionState() {
   } else {
     els.editNotice.textContent = `Palpites salvos como @${getCurrentUser().username} + número do palpite.`;
   }
-}
-
-function createMockPredictions() {
-  const mockDates = [
-    new Date("2026-06-04T09:15:00"),
-    new Date("2026-06-04T10:42:00"),
-    new Date("2026-06-04T11:08:00")
-  ];
-
-  return [
-    buildMockPrediction(state.users[0], 1, mockDates[0]),
-    buildMockPrediction(state.users[1], 1, mockDates[1]),
-    buildMockPrediction(state.users[2], 1, mockDates[2])
-  ];
-}
-
-function buildMockPrediction(user, number, date) {
-  const picks = groups.map((teams) => ({
-    first: teams[0],
-    second: teams[1],
-    third: teams[2]
-  }));
-
-  return {
-    id: createId(),
-    userId: user.id,
-    username: user.username,
-    periodId: state.periods[0]?.id || "fase-grupos",
-    number,
-    name: `@${user.username} #${number}`,
-    savedAt: date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }),
-    savedAtISO: date.toISOString(),
-    picks,
-    bracketWinners: {}
-  };
-}
-
-function createId() {
-  if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
-  return `prediction-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function updateStatus() {

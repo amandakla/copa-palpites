@@ -27,11 +27,17 @@
           <h1>Seu mural de palpites</h1>
         </div>
         <form class="auth-form" id="authForm">
-          <label for="authUsername">Username</label>
-          <div class="auth-row">
-            <input id="authUsername" type="text" placeholder="@username" maxlength="24" autocomplete="username">
-            <button class="primary-action" type="submit">Entrar</button>
+          <div class="auth-mode" role="tablist" aria-label="Modo de acesso">
+            <button class="auth-mode-button active" type="button" data-auth-mode="login">Entrar</button>
+            <button class="auth-mode-button" type="button" data-auth-mode="signup">Criar conta</button>
           </div>
+          <label class="signup-only is-hidden" for="authUsername">Username</label>
+          <input class="signup-only is-hidden" id="authUsername" type="text" placeholder="@username" maxlength="24" autocomplete="username">
+          <label for="authEmail">Email</label>
+          <input id="authEmail" type="email" placeholder="voce@email.com" autocomplete="email">
+          <label for="authPassword">Senha</label>
+          <input id="authPassword" type="password" placeholder="mínimo 6 caracteres" autocomplete="current-password">
+          <button class="primary-action" type="submit" id="authSubmitBtn">Entrar</button>
           <p class="feedback" id="authFeedback" aria-live="polite"></p>
         </form>
       </div>
@@ -64,7 +70,7 @@
             <span class="avatar" id="accountAvatar">A</span>
             <div>
               <strong id="accountUsername">@amanda</strong>
-              <small>usuário</small>
+              <small id="accountRole">usuário</small>
             </div>
           </div>
           <button id="savePredictionBtn" class="primary-action save-full" type="button">
@@ -106,7 +112,7 @@
         <nav class="main-tabs" aria-label="Navegação principal">
           <button class="main-tab active" type="button" data-screen="home">Home</button>
           <button class="main-tab" type="button" data-screen="prediction">Palpite</button>
-          <button class="main-tab" type="button" data-screen="admin">Admin</button>
+          <button class="main-tab admin-only is-hidden" type="button" data-screen="admin">Admin</button>
         </nav>
 
         <section class="screen active" id="homeScreen" aria-label="Início">
@@ -146,10 +152,6 @@
               <h2>Fase de grupos</h2>
               <p>Marque quem fica em 1º, 2º e 3º. Os terceiros entram como candidatos às 8 vagas restantes.</p>
             </div>
-            <button class="secondary-action" id="autoFillBtn" type="button">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="M13 5l7 7-7 7"/></svg>
-              Gerar exemplo
-            </button>
           </div>
           <div class="groups-grid" id="groupsGrid"></div>
         </section>
@@ -175,7 +177,7 @@
           <div class="section-heading">
             <div>
               <h2>Admin de períodos</h2>
-              <p>Mock da área onde você cria janelas de criação de palpites.</p>
+              <p>Área restrita para criar janelas de criação de palpites.</p>
             </div>
           </div>
           <form class="admin-form" id="periodForm">
@@ -206,6 +208,8 @@
       </article>
     </template>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./supabase-config.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

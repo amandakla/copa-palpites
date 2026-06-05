@@ -74,17 +74,40 @@ button {
   gap: 8px;
 }
 
+.auth-mode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+  padding: 4px;
+}
+
+.auth-mode-button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.auth-mode-button.active {
+  background: var(--ink);
+  color: #fff;
+}
+
+.signup-only.is-hidden {
+  display: none;
+}
+
 .auth-form label {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
-}
-
-.auth-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 104px;
-  gap: 8px;
 }
 
 .app-shell {
@@ -980,10 +1003,6 @@ h2 {
 
   .auth-card {
     padding: 20px;
-  }
-
-  .auth-row {
-    grid-template-columns: 1fr;
   }
 
   h1 {
