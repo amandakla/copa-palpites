@@ -113,6 +113,7 @@ const els = {
   authUsername: document.querySelector("#authUsername"),
   authEmail: document.querySelector("#authEmail"),
   authPassword: document.querySelector("#authPassword"),
+  authPasswordConfirm: document.querySelector("#authPasswordConfirm"),
   authSubmitBtn: document.querySelector("#authSubmitBtn"),
   authFeedback: document.querySelector("#authFeedback"),
   logoutBtn: document.querySelector("#logoutBtn"),
@@ -250,6 +251,8 @@ function setAuthMode(mode) {
   });
   els.authSubmitBtn.textContent = state.authMode === "signup" ? "Criar conta" : "Entrar";
   els.authPassword.autocomplete = state.authMode === "signup" ? "new-password" : "current-password";
+  els.authEmail.placeholder = state.authMode === "signup" ? "voce@email.com" : "voce@email.com ou @username";
+  els.authPasswordConfirm.value = "";
   els.authFeedback.textContent = "";
 }
 
@@ -1069,6 +1072,7 @@ async function handleAuthSubmit(event) {
 
   const identifier = els.authEmail.value.trim();
   const password = els.authPassword.value;
+  const passwordConfirm = els.authPasswordConfirm.value;
   const username = normalizeUsername(els.authUsername.value);
   els.authFeedback.className = "feedback";
 
@@ -1083,6 +1087,16 @@ async function handleAuthSubmit(event) {
   }
 
   if (state.authMode === "signup") {
+    if (!identifier.includes("@") || !identifier.includes(".")) {
+      showAuthFeedback("Use um email válido para criar a conta.", true);
+      return;
+    }
+
+    if (password !== passwordConfirm) {
+      showAuthFeedback("As senhas não conferem.", true);
+      return;
+    }
+
     const exists = await db.from("profiles").select("id").eq("username", username).maybeSingle();
     if (exists.data) {
       showAuthFeedback(`@${username} já está em uso.`, true);
@@ -1092,7 +1106,10 @@ async function handleAuthSubmit(event) {
     const { data, error } = await db.auth.signUp({
       email: identifier,
       password,
-      options: { data: { username } }
+      options: {
+        data: { username },
+        emailRedirectTo: window.location.origin
+      }
     });
 
     if (error) {
@@ -1101,7 +1118,7 @@ async function handleAuthSubmit(event) {
     }
 
     if (!data.session) {
-      showAuthFeedback("Conta criada. Confirme o email e depois entre.", false);
+      showAuthFeedback("Conta criada. Enviamos um email de confirmação. Confirme e depois entre.", false);
       setAuthMode("login");
       return;
     }
@@ -1123,6 +1140,7 @@ async function handleAuthSubmit(event) {
   els.authUsername.value = "";
   els.authEmail.value = "";
   els.authPassword.value = "";
+  els.authPasswordConfirm.value = "";
   els.authFeedback.textContent = "";
   renderAuthState();
   await refreshAppData();
