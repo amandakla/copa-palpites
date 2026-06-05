@@ -896,7 +896,10 @@ function renderPredictions() {
       </span>
       <small>${ranking.score} pts · ${escapeHtml(getPeriodTitle(getPredictionPeriodId(prediction)))} · ${escapeHtml(prediction.createdAt)} · @${escapeHtml(owner)}</small>
     `;
-    loadButton.addEventListener("click", () => loadPrediction(prediction.id));
+    loadButton.addEventListener("click", () => {
+      loadPrediction(prediction.id);
+      setScreen("prediction");
+    });
 
     row.appendChild(loadButton);
     els.predictionList.appendChild(row);
